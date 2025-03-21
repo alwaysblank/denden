@@ -1,6 +1,6 @@
 import Message, {PayloadGuard} from './message';
 
-class Hub extends EventTarget {
+export default class Hub extends EventTarget {
 	#channels: Array<{name: string, messages: Message[]}> = [];
 
 	/**
@@ -9,12 +9,12 @@ class Hub extends EventTarget {
 	 * If `provideLast` is true, then the last message for the channel (if any)
 	 * will be sent to `callback` before the listener is attached.
 	 */
-	sub(channel: string, callback: (msg: Message) => void, provideLast = false) {
-		const listener = (msg: Message) => {
-			if (msg.channel !== channel) {
+	sub(channel: string, callback: (payload: PayloadGuard) => void, provideLast = false) {
+		const listener = (msg: Event) => {
+			if (! (msg instanceof Message) || msg.channel !== channel) {
 				return;
 			}
-			callback(msg);
+			callback(msg.payload);
 		}
 		if (provideLast) {
 			const lastMessage = this.getLastMessage(channel);
@@ -31,12 +31,23 @@ class Hub extends EventTarget {
 	 */
 	pub<Payload extends PayloadGuard = PayloadGuard>(channel: string, payload: Payload) {
 		const msg = new Message(channel, payload);
-		let channelIndex = this.#channels.findIndex(({name}) => name === channel);
+		let channelIndex = this.#getChannelIndex(channel);
 		if (channelIndex === -1) {
 			channelIndex = this.#channels.push({ name: channel, messages: [] }) - 1;
 		}
 		const messageIndex = this.#channels[channelIndex].messages.push(msg) - 1;
 		this.dispatchEvent(this.#channels[channelIndex].messages[messageIndex]);
+	}
+
+	/**
+	 * Watches the target for an event type, and funnels that into a channel.
+	 */
+	watch(channel: string, target: EventTarget, eventType: string, processor: (e: Event) => any) {
+		const listener = (e: Event) => {
+			this.pub(channel, processor(e));
+		};
+		target.addEventListener(eventType, listener);
+		return () => target.removeEventListener(eventType, listener);
 	}
 
 	/**
