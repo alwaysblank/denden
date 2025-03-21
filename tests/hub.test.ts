@@ -32,7 +32,7 @@ test('Subscribe and receive old', () => {
 	const hub = new Hub();
 	const callback = jest.fn();
 	hub.pub('test', 'sandwich');
-	hub.sub('test', callback, true);
+	hub.sub('test', callback, -1);
 	expect(callback).toHaveBeenCalledTimes(1);
 	expect(callback).toHaveBeenCalledWith('sandwich');
 });

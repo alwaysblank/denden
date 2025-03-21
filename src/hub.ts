@@ -8,20 +8,23 @@ export default class Hub extends EventTarget {
 	 *
 	 * If `provideLast` is true, then the last message for the channel (if any)
 	 * will be sent to `callback` before the listener is attached.
+	 *
+	 * @param {string} channel Name of the channel to subscribe to. Does not need to exist.
+	 * @param {function} callback Called with message payload when a message is published.
+	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription. -1 is all messages.
 	 */
-	sub(channel: string, callback: (payload: PayloadGuard) => void, provideLast = false) {
+	sub(channel: string, callback: (payload: PayloadGuard) => void, backlog: number = 0) {
 		const listener = (msg: Event) => {
 			if (! (msg instanceof Message) || msg.channel !== channel) {
 				return;
 			}
 			callback(msg.payload);
 		}
-		if (provideLast) {
-			const lastMessage = this.getLastMessage(channel);
-			if ('undefined' !== typeof lastMessage) {
-				listener(lastMessage);
-			}
+		// -1 means "all messages" so anything less than that would be confusing.
+		if (backlog < -1) {
+			backlog = -1;
 		}
+		this.getMessages(channel, backlog).forEach(listener);
 		this.addEventListener(Message.NAME, listener);
 		return () => this.removeEventListener(Message.NAME, listener);
 	}
@@ -31,12 +34,9 @@ export default class Hub extends EventTarget {
 	 */
 	pub<Payload extends PayloadGuard = PayloadGuard>(channel: string, payload: Payload) {
 		const msg = new Message(channel, payload);
-		let channelIndex = this.#getChannelIndex(channel);
-		if (channelIndex === -1) {
-			channelIndex = this.#channels.push({ name: channel, messages: [] }) - 1;
-		}
-		const messageIndex = this.#channels[channelIndex].messages.push(msg) - 1;
-		this.dispatchEvent(this.#channels[channelIndex].messages[messageIndex]);
+		let i = this.#createChannel(channel);
+		const messageIndex = this.#channels[i].messages.push(msg) - 1;
+		this.dispatchEvent(this.#channels[i].messages[messageIndex]);
 	}
 
 	/**
@@ -51,26 +51,20 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-	 * Get all messages for a channel, with the most recent first.
+	 * Get a set of
 	 */
-	getMessages(channel: string) {
+	getMessages(channel: string, count: number = -1) {
+		if (count === 0) {
+			return [];
+		}
 		const i = this.#getChannelIndex(channel);
 		if (i === -1) {
 			return [];
 		}
-		const messages = this.#channels[i].messages;
-		return messages.reverse();
-	}
-
-	/**
-	 * Returns the last message, if any, sent to a particular channel.
-	 */
-	getLastMessage(channel: string) {
-		const i = this.#getChannelIndex(channel);
-		if (i === -1) {
-			return undefined;
+		if (count === -1) {
+			count = count = this.#channels.length;
 		}
-		return this.#channels[i].messages[this.#channels[i].messages.length - 1];
+		return this.#channels[i].messages.slice(-1 * count).reverse();
 	}
 
 	/**
@@ -78,5 +72,19 @@ export default class Hub extends EventTarget {
 	 */
 	#getChannelIndex(channel: string) {
 		return this.#channels.findIndex(({name}) => name === channel);
+	}
+
+	/**
+	 * Create a channel if one does not already exist. Returns the index of the new channel, or the existing channel.
+	 *
+	 * @param {string} channel The name of the channel
+	 * @param {Message[]} [prepopulate=[]] Add messages to channel on creation. These will not trigger listeners.
+	 */
+	#createChannel(channel: string, prepopulate: Message[] = []): number {
+		const existing = this.#getChannelIndex(channel);
+		if (existing > -1) {
+			return existing;
+		}
+		return this.#channels.push({ name: channel, messages: prepopulate }) - 1;
 	}
 }
