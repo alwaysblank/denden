@@ -53,7 +53,7 @@ export default class Hub extends EventTarget {
 	/**
 	 * Get a set of
 	 */
-	getMessages(channel: string, count: number = -1) {
+	getMessages(channel: string, count: number = Infinity) {
 		if (count === 0) {
 			return [];
 		}
@@ -61,10 +61,13 @@ export default class Hub extends EventTarget {
 		if (i === -1) {
 			return [];
 		}
-		if (count === -1) {
-			count = count = this.#channels.length;
+		if (Math.abs(count) === Infinity) {
+			const messages = [...this.#channels[i].messages];
+			return count < 0 ? messages : messages.reverse();
 		}
-		return this.#channels[i].messages.slice(-1 * count).reverse();
+		return count < 0
+			? this.#channels[i].messages.slice(0, -1 * count).reverse()
+			: this.#channels[i].messages.slice(-1 * count).reverse();
 	}
 
 	/**

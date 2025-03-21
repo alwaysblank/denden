@@ -32,7 +32,7 @@ test('Subscribe and receive old', () => {
 	const hub = new Hub();
 	const callback = jest.fn();
 	hub.pub('test', 'sandwich');
-	hub.sub('test', callback, -1);
+	hub.sub('test', callback, 1);
 	expect(callback).toHaveBeenCalledTimes(1);
 	expect(callback).toHaveBeenCalledWith('sandwich');
 });
@@ -74,4 +74,18 @@ test('Watch another event dispatcher', () => {
 	emitter.dispatchEvent(new Event('test'));
 	expect(callback).toHaveBeenCalledTimes(1);
 	expect(hub.getMessages('emitter')).toHaveLength(1);
+});
+
+test('Get past messages', () => {
+	const hub = new Hub();
+	hub.pub('test', 'sandwich');
+	hub.pub('test', 'hamburger');
+	hub.pub('test', 'salad');
+	expect(hub.getMessages('test')).toHaveLength(3); // Default is to return all.
+	expect(hub.getMessages('test', Infinity)).toHaveLength(3);
+	expect(hub.getMessages('test', 1)).toHaveLength(1);
+	expect(hub.getMessages('test', -1)).toHaveLength(1);
+	expect(hub.getMessages('test', 2)).toHaveLength(2);
+	expect(hub.getMessages('test', 1)[0].payload).toBe('salad'); // Should return last item.
+	expect(hub.getMessages('test', -1)[0].payload).toBe('sandwich'); // Should return first item.
 })
