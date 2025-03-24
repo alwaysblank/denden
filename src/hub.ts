@@ -1,4 +1,4 @@
-import Message, {PayloadGuard} from './message';
+import Message from './message';
 
 export default class Hub extends EventTarget {
 	#channels: Array<{name: string, messages: Message[]}> = [];
@@ -13,7 +13,7 @@ export default class Hub extends EventTarget {
 	 * @param {function} callback Called with message payload when a message is published.
 	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription. -1 is all messages.
 	 */
-	sub(channel: string, callback: (payload: PayloadGuard) => void, backlog: number = 0) {
+	sub<Payload extends any = any>(channel: string, callback: (payload: Payload) => void, backlog: number = 0) {
 		const listener = (msg: Event) => {
 			if (! (msg instanceof Message) || msg.channel !== channel) {
 				return;
@@ -28,7 +28,7 @@ export default class Hub extends EventTarget {
 	/**
 	 * Publish a message to a particular channel.
 	 */
-	pub<Payload extends PayloadGuard = PayloadGuard>(channel: string, payload: Payload) {
+	pub<Payload extends any = any>(channel: string, payload: Payload) {
 		const msg = new Message(channel, payload);
 		let i = this.#createChannel(channel);
 		const messageIndex = this.#channels[i].messages.push(msg) - 1;
@@ -38,9 +38,9 @@ export default class Hub extends EventTarget {
 	/**
 	 * Watches the target for an event type, and funnels that into a channel.
 	 */
-	watch(channel: string, target: EventTarget, eventType: string, processor: (e: Event) => any) {
+	watch<Payload extends any = any>(channel: string, target: EventTarget, eventType: string, processor: (e: Event) => Payload) {
 		const listener = (e: Event) => {
-			this.pub(channel, processor(e));
+			this.pub<Payload>(channel, processor(e));
 		};
 		target.addEventListener(eventType, listener);
 		return () => target.removeEventListener(eventType, listener);
@@ -88,7 +88,7 @@ export default class Hub extends EventTarget {
 	 * @param {string} channel The name of the channel
 	 * @param {Message[]} [prepopulate=[]] Add messages to channel on creation. These will not trigger listeners.
 	 */
-	#createChannel(channel: string, prepopulate: Message[] = []): number {
+	#createChannel<Payload extends any = any>(channel: string, prepopulate: Message<Payload>[] = []): number {
 		const existing = this.#getChannelIndex(channel);
 		if (existing > -1) {
 			return existing;
