@@ -51,7 +51,16 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-	 * Get a set of
+	 * Get a set of messages that were already sent to the channel.
+	 *
+	 * Messages are returned in reverse chronological order (most recent -> oldest),
+	 * unless `count` is negative, in which case they are returned in
+	 * chronological order.
+	 *
+	 * Passing `Infinity` to `count` will return all messages and is the default
+	 * setting. `-Infinity` will return all messages in chronological order.
+	 *
+	 * Note that this returns `Message` objects (i.e. Events).
 	 */
 	getMessages(channel: string, count: number = Infinity) {
 		if (count === 0) {
