@@ -20,10 +20,6 @@ export default class Hub extends EventTarget {
 			}
 			callback(msg.payload);
 		}
-		// -1 means "all messages" so anything less than that would be confusing.
-		if (backlog < -1) {
-			backlog = -1;
-		}
 		this.getMessages(channel, backlog).forEach(listener);
 		this.addEventListener(Message.NAME, listener);
 		return () => this.removeEventListener(Message.NAME, listener);
