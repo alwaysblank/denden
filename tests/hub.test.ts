@@ -12,7 +12,7 @@ test('Subscribe and receive', () => {
 	hub.sub('test', callback);
 	hub.pub('test', 'sandwich');
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('sandwich');
+	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
 });
 
 test('Subscribe and receive multiple', () => {
@@ -23,9 +23,9 @@ test('Subscribe and receive multiple', () => {
 	hub.pub('test', 'hamburger');
 	hub.pub('test', 'salad');
 	expect(callback).toHaveBeenCalledTimes(3);
-	expect(callback).toHaveBeenCalledWith('sandwich');
-	expect(callback).toHaveBeenCalledWith('hamburger');
-	expect(callback).toHaveBeenCalledWith('salad');
+	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('salad', 'test', expect.any(Function));
 	expect(hub.getMessages('test')).toHaveLength(3);
 });
 
@@ -35,7 +35,7 @@ test('Subscribe and receive old', () => {
 	hub.pub('test', 'sandwich');
 	const unsub1 = hub.sub('test', callback, 1);
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('sandwich');
+	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
 	unsub1(); // Remote first sub.
 	hub.pub('test', 'hamburger');
 	hub.pub('test', 'salad');
@@ -47,25 +47,25 @@ test('Subscribe and receive old', () => {
 
 	hub.sub('test', callback2items, 2);
 	expect(callback2items).toHaveBeenCalledTimes(2);
-	expect(callback2items).toHaveBeenCalledWith('ice cream');
-	expect(callback2items).toHaveBeenCalledWith('salad');
-	expect(callback2items).not.toHaveBeenCalledWith('hamburger');
-	expect(callback2items).not.toHaveBeenCalledWith('sandwich');
+	expect(callback2items).toHaveBeenCalledWith('ice cream', 'test', expect.any(Function));
+	expect(callback2items).toHaveBeenCalledWith('salad', 'test', expect.any(Function));
+	expect(callback2items).not.toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
+	expect(callback2items).not.toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
 
 
 	hub.sub('test', callbackAllItems, Infinity);
 	expect(callbackAllItems).toHaveBeenCalledTimes(4);
-	expect(callbackAllItems).toHaveBeenCalledWith('ice cream');
-	expect(callbackAllItems).toHaveBeenCalledWith('salad');
-	expect(callbackAllItems).toHaveBeenCalledWith('hamburger');
-	expect(callbackAllItems).toHaveBeenCalledWith('sandwich');
+	expect(callbackAllItems).toHaveBeenCalledWith('ice cream', 'test', expect.any(Function));
+	expect(callbackAllItems).toHaveBeenCalledWith('salad', 'test', expect.any(Function));
+	expect(callbackAllItems).toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
+	expect(callbackAllItems).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
 
 	hub.sub('test', callbackNegativeItems, -2);
 	expect(callbackNegativeItems).toHaveBeenCalledTimes(2);
-	expect(callbackNegativeItems).toHaveBeenCalledWith('hamburger');
-	expect(callbackNegativeItems).toHaveBeenCalledWith('sandwich');
-	expect(callbackNegativeItems).not.toHaveBeenCalledWith('ice cream');
-	expect(callbackNegativeItems).not.toHaveBeenCalledWith('salad');
+	expect(callbackNegativeItems).toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
+	expect(callbackNegativeItems).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
+	expect(callbackNegativeItems).not.toHaveBeenCalledWith('ice cream', 'test', expect.any(Function));
+	expect(callbackNegativeItems).not.toHaveBeenCalledWith('salad', 'test', expect.any(Function));
 });
 
 test('Subscribe and don\'t receive old', () => {
@@ -82,13 +82,25 @@ test('Subscribe and unsubscribe', () => {
 	const unsub = hub.sub('test', callback);
 	hub.pub('test', 'sandwich');
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('sandwich');
+	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
 	expect(hub.getMessages('test')).toHaveLength(1)
 	unsub();
 	hub.pub('test', 'hamburger');
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('sandwich');
+	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
+	expect(callback).not.toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
 	expect(hub.getMessages('test')).toHaveLength(2);
+
+	const inner = jest.fn();
+	hub.sub('test', (payload, channel, unsub) => {
+		inner(payload);
+		unsub();
+	});
+	hub.pub('test', 'salad');
+	hub.pub('test', 'ice cream');
+	expect(inner).toHaveBeenCalledTimes(1);
+	expect(inner).toHaveBeenCalledWith('salad');
+	expect(inner).not.toHaveBeenCalledWith('ice cream');
 });
 
 test('Subscribe and receive nothing from non-hub events', () => {
@@ -112,7 +124,7 @@ test('Watch another event dispatcher', () => {
 	hub.sub('emitter', callback);
 	emitter.dispatchEvent(new Event('test'));
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('test');
+	expect(callback).toHaveBeenCalledWith('test', 'emitter', expect.any(Function));
 	expect(hub.getMessages('emitter')).toHaveLength(1);
 	unwatch();
 	emitter.dispatchEvent(new Event('test'));

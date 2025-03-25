@@ -6,19 +6,21 @@ export default class Hub extends EventTarget {
 	/**
 	 * Listen to messages sent to a particular channel.
 	 *
-	 * If `provideLast` is true, then the last message for the channel (if any)
-	 * will be sent to `callback` before the listener is attached.
+	 * Returns a method which, when called, will terminate the subscription;
+	 * `callback` will not receive any further messages.
 	 *
-	 * @param {string} channel Name of the channel to subscribe to. Does not need to exist.
-	 * @param {function} callback Called with message payload when a message is published.
+	 * @param {string} channel Name of the channel to subscribe to. Does not need to exist to be subscribed to. Passing `*` will subscribe to all channels.
+	 * @param {function} callback Called with message payload and channel name when a message is published.
 	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription. -1 is all messages.
 	 */
-	sub<Payload extends any = any>(channel: string, callback: (payload: Payload) => void, backlog: number = 0) {
+	sub<Payload extends any = any>(channel: string, callback: (payload: Payload, channel: string, unsub: () => void) => void, backlog: number = 0) {
 		const listener = (msg: Event) => {
-			if (! (msg instanceof Message) || msg.channel !== channel) {
+			if (! (msg instanceof Message)
+				|| (msg.channel !== channel || '*' === channel)
+			) {
 				return;
 			}
-			callback(msg.payload);
+			callback(msg.payload, msg.channel, () => this.removeEventListener(Message.NAME, listener));
 		}
 		this.getMessages(channel, backlog).forEach(listener);
 		this.addEventListener(Message.NAME, listener);
