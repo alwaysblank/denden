@@ -1,11 +1,16 @@
 {
-  "name": "denden",
+  "name": "@alwaysblank/denden",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alwaysblank/denden.git"
+  },
   "version": "1.0.0",
   "description": "",
   "scripts": {
     "build": "rollup --config",
     "test": "jest"
   },
+  "files": ["dist/bundle.js", "src/", "README.md"],
   "devDependencies": {
     "@babel/core": "^7.26.10",
     "@babel/preset-env": "^7.26.9",
