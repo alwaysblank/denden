@@ -1,7 +1,18 @@
 import Message from './message';
 
+export type Callback<Payload extends any = any> = (payload: Payload, channel: string, unsub: () => void) => void;
+
+type Channels = Array<{name: string, messages: Message[]}>;
+
 export default class Hub extends EventTarget {
-	#channels: Array<{name: string, messages: Message[]}> = [];
+	#channels: Channels = [];
+
+	// prepopulate allows us to pre-create, and potentially pre-fill, channels.
+	// mount allows us to associate the hub w/ an existing eventTarget (i.e. `window`) to make non-standard dispatching easier.
+	// Maybe this involves adding methods that proxy hub methods to that target...?
+	constructor(prepopulate?: Channels, mount?: EventTarget) {
+		super();
+	}
 
 	/**
 	 * Listen to messages sent to a particular channel.
@@ -13,7 +24,7 @@ export default class Hub extends EventTarget {
 	 * @param {function} callback Called with message payload and channel name when a message is published.
 	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription. -1 is all messages.
 	 */
-	sub<Payload extends any = any>(channel: string, callback: (payload: Payload, channel: string, unsub: () => void) => void, backlog: number = 0) {
+	sub<Payload extends any = any>(channel: string, callback: Callback<Payload>, backlog: number = 0) {
 		const listener = (msg: Event) => {
 			if (! (msg instanceof Message)
 				|| (msg.channel !== channel || '*' === channel)
@@ -46,6 +57,16 @@ export default class Hub extends EventTarget {
 		};
 		target.addEventListener(eventType, listener);
 		return () => target.removeEventListener(eventType, listener);
+	}
+
+	wait<Payload extends any = any>(channel: string, callback: Callback<Payload>) {
+		const queued = this.getMessages(channel, 1);
+		if (queued.length) {
+			this.sub(channel, callback, 1);
+			return;
+		}
+		// Use a promise to return a callback
+		// Figure out a way to handle failures (not something sub() is otherwise concerned with)
 	}
 
 	/**
