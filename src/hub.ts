@@ -1,44 +1,110 @@
 import Message from './message';
+import Channel, {ChannelQuery} from './channel';
+import {match, sortByProp} from "./tools";
 
+export type ChannelRoute = string | RegExp;
+
+export type Callback<Payload> = (payload: Payload, message: Message<Payload>, unsub: (reason?: string) => void) => void;
+
+type HubQuery = {
+	cid: ChannelRoute|ChannelRoute[],
+} & ChannelQuery;
+
+/**
+ * Hub for sending and registering to receive messages.
+ */
 export default class Hub extends EventTarget {
-	#channels: Array<{name: string, messages: Message[]}> = [];
+	private channels: Map<string, Channel<any>> = new Map();
 
 	/**
 	 * Listen to messages sent to a particular channel.
 	 *
 	 * Returns a method which, when called, will terminate the subscription;
-	 * `callback` will not receive any further messages.
+	 * `callback` will not receive any further messages. Optionally, this
+     * `usub` method takes a string argument, indicating why we have
+     * unsubscribed from this channel. (Currently this is not accessible.)
+	 *
+	 * This method attempts to call `listener` for all historical messages
+	 * in the order in which they were received, but it is theoretically
+	 * possible to construct a circumstance in which messages might be
+	 * received out of order. {@link Message#timestamp} will always be greater
+	 * for messages that have been dispatched more recently. However, it is
+	 * a generally good practice for `listener` to be idempotent.
 	 *
 	 * @param {string} channel Name of the channel to subscribe to. Does not need to exist to be subscribed to. Passing `*` will subscribe to all channels.
 	 * @param {function} callback Called with message payload and channel name when a message is published.
-	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription. -1 is all messages.
+	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription.
 	 */
-	sub<Payload extends any = any>(channel: string, callback: (payload: Payload, channel: string, unsub: () => void) => void, backlog: number = 0) {
+	sub<Payload extends any = any>(channel: ChannelRoute, callback: Callback<Payload>, backlog: number = 0) {
+        const controller = new AbortController();
 		const listener = (msg: Event) => {
-			if (! (msg instanceof Message)
-				|| (msg.channel !== channel || '*' === channel)
-			) {
-				return;
+			if (msg instanceof Message && match(channel, msg.channel.name)) {
+				callback(msg.payload, msg, (reason?: string) => controller.abort(reason));
 			}
-			callback(msg.payload, msg.channel, () => this.removeEventListener(Message.NAME, listener));
 		}
-		this.getMessages(channel, backlog).forEach(listener);
-		this.addEventListener(Message.NAME, listener);
-		return () => this.removeEventListener(Message.NAME, listener);
+		this.addEventListener(Message.NAME, listener, {signal: controller.signal});
+        for (const m of this.query({cid: channel, order: 'DESC', limit: backlog})) {
+            if (controller.signal.aborted) {
+                break;
+            }
+            listener(m);
+        }
+		return (reason?: string) => controller.abort(reason);
 	}
+
+    /**
+     * Run a callback once.
+     *
+     * @param {string} channel Name of the channel to subscribe to. Does not need to exist to be subscribed to. Passing `*` will subscribe to all channels.
+     * @param {function} callback Called with message payload and channel name when a message is published.
+     * @param {boolean} [onlyFuture=false] If `true`, `callback` will fire only for messages dispatched in the future. If `false`, messages in the backlog will also be considered.
+     */
+    once<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, onlyFuture: boolean = false) {
+        return this.sub<Payload>(channel, (payload, message, unsub) => {
+            callback(payload, message, unsub);
+            unsub('Called with once().');
+        }, onlyFuture ? 0 : 1);
+    }
+
+    /**
+     * Run callback only if `test` evaluates to `true`.
+     */
+    only<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, test: (payload: Payload, message: Message<Payload>) => boolean, onlyFuture: boolean = false) {
+        return this.sub<Payload>(channel, (payload, message, unsub) => {
+            if (!test(payload, message)) {
+                return;
+            }
+            callback(payload, message, unsub);
+        }, onlyFuture ? 0 : 1);
+    }
+
+    /**
+     * Remove subscription when `test` evaluates to `true`.
+     */
+    until<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, test: (payload: Payload, message: Message<Payload>) => boolean, onlyFuture: boolean = false) {
+        return this.sub(channel, (payload, message, unsub) => {
+            if (test(payload, message)) {
+                unsub('Met until() condition.');
+                return;
+            }
+            callback(payload, message, unsub);
+        }, onlyFuture ? 0 : 1);
+    }
 
 	/**
 	 * Publish a message to a particular channel.
 	 */
-	pub<Payload extends any = any>(channel: string, payload: Payload) {
-		const msg = new Message(channel, payload);
-		let i = this.#createChannel(channel);
-		const messageIndex = this.#channels[i].messages.push(msg) - 1;
-		this.dispatchEvent(this.#channels[i].messages[messageIndex]);
+	pub<Payload extends any = any>(cid: string, ...payload: Payload[]) {
+		let channel = this.channels.get(cid);
+		if (!(channel instanceof Channel)) {
+			channel = new Channel(cid);
+			this.channels.set(cid, channel);
+		}
+		channel.send(this, ...payload.map(p => Message.create(channel, p)));
 	}
 
 	/**
-	 * Watches the target for an event type, and funnels that into a channel.
+	 * Watch `target` for an event of `eventType`, and then broadcast it to `channel`.
 	 */
 	watch<Payload extends any = any>(channel: string, target: EventTarget, eventType: string, processor: (e: Event) => Payload) {
 		const listener = (e: Event) => {
@@ -52,49 +118,59 @@ export default class Hub extends EventTarget {
 	 * Get a set of messages that were already sent to the channel.
 	 *
 	 * Messages are returned in reverse chronological order (most recent -> oldest),
-	 * unless `count` is negative, in which case they are returned in
-	 * chronological order.
 	 *
-	 * Passing `Infinity` to `count` will return all messages and is the default
-	 * setting. `-Infinity` will return all messages in chronological order.
+	 * @param {Object} query - Set of query options for retrieving messages.
+	 * @param {array} query.cid - A argument (or array of arguments) which can resolve to channel names.
+	 * @param {number} [query.limit=1] - The number of messages to return.
+	 * @param {'ASC'|'DESC'} [query.order='DESC'] - Messages are sorted by order of dispatch: `ASC` is oldest -> newest, `DESC` is newest -> oldest.
 	 *
-	 * Note that this returns `Message` objects (i.e. Events).
+	 * @return {Message[]} All messages from matching channel(s) which match the `query`. The `Message.channel` property contains a reference to the {@link Channel} that an individual message came from.
 	 */
-	getMessages(channel: string, count: number = Infinity) {
-		if (count === 0) {
+	query(query: HubQuery): Message[] {
+		const {
+			cid,
+			limit = 1,
+			order = 'DESC',
+		} = query;
+
+		if ('undefined' === typeof cid) {
 			return [];
 		}
-		const i = this.#getChannelIndex(channel);
-		if (i === -1) {
+
+		if (limit === 0) {
+			// This will never result in returning any messages, so save some time.
 			return [];
 		}
-		if (Math.abs(count) === Infinity) {
-			const messages = [...this.#channels[i].messages];
-			return count < 0 ? messages : messages.reverse();
-		}
-		return count < 0
-			? this.#channels[i].messages.slice(0, -1 * count).reverse()
-			: this.#channels[i].messages.slice(-1 * count).reverse();
+
+		const routes = Array.isArray(cid) ? cid : [cid];
+
+		const messages = Array.from(routes.reduce((collection, route) => {
+			return collection.union(this.getChannelsBy(route));
+		}, new Set<string>()))
+			.reduce((collection, channel) => {
+				const msgs = this.channels.get(channel)?.messages;
+				if (msgs) {
+					collection = sortByProp(collection.concat(msgs), 'timestamp', order);
+				}
+				return collection;
+			}, [] as Message[])
+
+		return messages.slice(0, limit);
 	}
 
 	/**
-	 * Return the internal index of a channel.
+	 * Return a Set of channels tracked by this Hub that match `channel`.
 	 */
-	#getChannelIndex(channel: string) {
-		return this.#channels.findIndex(({name}) => name === channel);
-	}
-
-	/**
-	 * Create a channel if one does not already exist. Returns the index of the new channel, or the existing channel.
-	 *
-	 * @param {string} channel The name of the channel
-	 * @param {Message[]} [prepopulate=[]] Add messages to channel on creation. These will not trigger listeners.
-	 */
-	#createChannel<Payload extends any = any>(channel: string, prepopulate: Message<Payload>[] = []): number {
-		const existing = this.#getChannelIndex(channel);
-		if (existing > -1) {
-			return existing;
+	private getChannelsBy(channel: ChannelRoute): Set<string> {
+		if ('*' === channel) {
+			return new Set(this.channels.keys());
 		}
-		return this.#channels.push({ name: channel, messages: prepopulate }) - 1;
+		const channels = new Set<string>();
+		this.channels.keys().forEach(c => {
+			if (match(channel, c)) {
+				channels.add(c);
+			}
+		});
+		return channels;
 	}
 }
