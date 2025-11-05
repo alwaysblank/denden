@@ -16,7 +16,7 @@ export default class Hub extends EventTarget {
 	 * @param {function} callback Called with message payload and channel name when a message is published.
 	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription.
 	 */
-	sub<Payload extends any = any>(channel: string|RegExp, callback: (payload: Payload, channel: string, unsub: () => void) => void, backlog: number = 0) {
+	sub<Payload extends any = any>(channel: ChannelRoute, callback: (payload: Payload, channel: string, unsub: () => void) => void, backlog: number = 0) {
 		const listener = (msg: Event) => {
 			if (!(msg instanceof Message) || !this.#matchChannel(channel, msg.channel)) {
 				return;
@@ -125,7 +125,7 @@ export default class Hub extends EventTarget {
 	 */
 	getChannels(channel: ChannelRoute): Set<string> {
 		if ('*' === channel) {
-			return new Set(...this.#channels);
+			return new Set(this.#channels);
 		}
 		const channels = new Set<string>();
 		this.#channels.forEach(c => {

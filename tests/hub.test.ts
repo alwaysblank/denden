@@ -146,11 +146,57 @@ test('Get past messages', () => {
 
 test('Subscribe to multiple channels', () => {
 	const hub = new Hub();
+
+	const getAll = jest.fn();
+	hub.sub('test/*', getAll);
+
+	const getRegex = jest.fn();
+	hub.sub(/test\/[1-2]/, getRegex);
+
 	hub.pub('test/1', 'test one');
 	hub.pub('test/2', 'test two');
 	hub.pub('test/3', 'test three');
 
-	const getAll = jest.fn();
-	hub.sub('test/*', getAll);
 	expect(getAll).toHaveBeenCalledTimes(3);
+	expect(getAll).toHaveBeenCalledWith('test one', 'test/1', expect.any(Function));
+	expect(getAll).toHaveBeenCalledWith('test two', 'test/2', expect.any(Function));
+	expect(getAll).toHaveBeenCalledWith('test three', 'test/3', expect.any(Function));
+	expect(getRegex).toHaveBeenCalledTimes(2);
+	expect(getRegex).toHaveBeenCalledWith('test one', 'test/1', expect.any(Function));
+	expect(getRegex).toHaveBeenCalledWith('test two', 'test/2', expect.any(Function));
+	expect(getRegex).not.toHaveBeenCalledWith('test three', 'test/3', expect.any(Function));
+});
+
+test('Get from multiple channels', () => {
+	const hub = new Hub();
+
+	hub.pub('test/1', 'test one');
+	hub.pub('test/2', 'test two');
+	hub.pub('test/3', 'test three');
+	hub.pub('sandwich/reuben', ['russian dressing', 'pastrami']);
+
+	const all = hub.getMessages('*');
+	expect(all).toHaveLength(4);
+	expect(all.map(m => m.payload)).toStrictEqual([
+		['russian dressing', 'pastrami'],
+		'test three',
+		'test two',
+		'test one',
+	]);
+
+	const allReverse = hub.getMessages('*', {order: 'ASC'});
+	expect(allReverse).toHaveLength(4);
+	expect(allReverse.map(m => m.payload)).toStrictEqual([
+		'test one',
+		'test two',
+		'test three',
+		['russian dressing', 'pastrami'],
+	]);
+
+	const regex = hub.getMessages( /test\/2|sandwich\/\w+/);
+	expect(regex).toHaveLength(2);
+	expect(regex.map(m => m.payload)).toStrictEqual([
+		['russian dressing', 'pastrami'],
+		'test two',
+	])
 });
