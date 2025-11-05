@@ -1,5 +1,5 @@
 export default class Message<Payload extends any = any> extends Event {
-	static NAME = 'psmsg';
+	static NAME = 'denden-msg';
 	constructor(public readonly channel: string, public readonly payload: Payload, public readonly timestamp: number) {
 		super(Message.NAME, {bubbles: false});
 	}
