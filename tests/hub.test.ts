@@ -1,5 +1,10 @@
 import Hub from '../src/hub';
 import Message from '../src/message';
+import Channel from '../src/channel';
+
+beforeEach(() => {
+	Channel.channels.clear(); // We don't want to track Channels between tests.
+})
 
 test('Create a hub', () => {
 	const hub = new Hub();
@@ -59,13 +64,6 @@ test('Subscribe and receive old', () => {
 	expect(callbackAllItems).toHaveBeenCalledWith('salad', 'test', expect.any(Function));
 	expect(callbackAllItems).toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
 	expect(callbackAllItems).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
-
-	hub.sub('test', callbackNegativeItems, -2);
-	expect(callbackNegativeItems).toHaveBeenCalledTimes(2);
-	expect(callbackNegativeItems).toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
-	expect(callbackNegativeItems).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
-	expect(callbackNegativeItems).not.toHaveBeenCalledWith('ice cream', 'test', expect.any(Function));
-	expect(callbackNegativeItems).not.toHaveBeenCalledWith('salad', 'test', expect.any(Function));
 });
 
 test('Subscribe and don\'t receive old', () => {
@@ -138,12 +136,21 @@ test('Get past messages', () => {
 	hub.pub('test', 'hamburger');
 	hub.pub('test', 'salad');
 	expect(hub.getMessages('test')).toHaveLength(3); // Default is to return all.
-	expect(hub.getMessages('test', Infinity)).toHaveLength(3);
-	expect(hub.getMessages('test', -Infinity)).toHaveLength(3);
-	expect(hub.getMessages('test', 1)).toHaveLength(1);
-	expect(hub.getMessages('test', -1)).toHaveLength(1);
-	expect(hub.getMessages('test', 2)).toHaveLength(2);
-	expect(hub.getMessages('test', 1)[0].payload).toBe('salad'); // Should return last item.
-	expect(hub.getMessages('test', -1)[0].payload).toBe('sandwich'); // Should return first item.
-	expect(hub.getMessages('does not exist', 10)).toStrictEqual([]);
-})
+	expect(hub.getMessages('test', {limit: 1})).toHaveLength(1);
+	expect(hub.getMessages('test', {limit: 1, order: 'ASC'})).toHaveLength(1);
+	expect(hub.getMessages('test', {limit: 2})).toHaveLength(2);
+	expect(hub.getMessages('test', {limit: 1})[0].payload).toBe('salad'); // Should return last item.
+	expect(hub.getMessages('test', {limit: 1, order: 'ASC'})[0].payload).toBe('sandwich'); // Should return first item.
+	expect(hub.getMessages('does not exist', {limit: 10})).toStrictEqual([]);
+});
+
+test('Subscribe to multiple channels', () => {
+	const hub = new Hub();
+	hub.pub('test/1', 'test one');
+	hub.pub('test/2', 'test two');
+	hub.pub('test/3', 'test three');
+
+	const getAll = jest.fn();
+	hub.sub('test/*', getAll);
+	expect(getAll).toHaveBeenCalledTimes(3);
+});
