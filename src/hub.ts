@@ -1,5 +1,7 @@
 import Message from './message';
 
+export type ChannelRoute = string | RegExp;
+
 export default class Hub extends EventTarget {
 	#channels: Array<{name: string, messages: Message[]}> = [];
 
@@ -13,11 +15,9 @@ export default class Hub extends EventTarget {
 	 * @param {function} callback Called with message payload and channel name when a message is published.
 	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription. -1 is all messages.
 	 */
-	sub<Payload extends any = any>(channel: string, callback: (payload: Payload, channel: string, unsub: () => void) => void, backlog: number = 0) {
+	sub<Payload extends any = any>(channel: string|RegExp, callback: (payload: Payload, channel: string, unsub: () => void) => void, backlog: number = 0) {
 		const listener = (msg: Event) => {
-			if (! (msg instanceof Message)
-				|| (msg.channel !== channel || '*' === channel)
-			) {
+			if (!(msg instanceof Message) || !this.#matchChannel(channel, msg.channel)) {
 				return;
 			}
 			callback(msg.payload, msg.channel, () => this.removeEventListener(Message.NAME, listener));
@@ -31,7 +31,7 @@ export default class Hub extends EventTarget {
 	 * Publish a message to a particular channel.
 	 */
 	pub<Payload extends any = any>(channel: string, payload: Payload) {
-		const msg = new Message(channel, payload);
+		const msg = Message.create<Payload>(channel, payload);
 		let i = this.#createChannel(channel);
 		const messageIndex = this.#channels[i].messages.push(msg) - 1;
 		this.dispatchEvent(this.#channels[i].messages[messageIndex]);
@@ -60,21 +60,50 @@ export default class Hub extends EventTarget {
 	 *
 	 * Note that this returns `Message` objects (i.e. Events).
 	 */
-	getMessages(channel: string, count: number = Infinity) {
+	getMessages(channel: ChannelRoute|ChannelRoute[], count: number = Infinity): Message[] {
 		if (count === 0) {
 			return [];
 		}
-		const i = this.#getChannelIndex(channel);
-		if (i === -1) {
-			return [];
+
+		if (!Array.isArray(channel)) {
+			const ids = this.#getChannelIds(channel);
+			switch(ids.length) {
+				case 0:
+					return [];
+				case 1: {
+					const i = ids[0];
+					return count < 0
+						? this.#channels[i].messages.slice(0, -1 * count).reverse()
+						: this.#channels[i].messages.slice(-1 * count).reverse();
+				}
+				default:
+					return this.getMessages(
+						ids.map( id => this.#getChannelName(id)).filter(name => 'string' === typeof name),
+						count
+					);
+			}
 		}
-		if (Math.abs(count) === Infinity) {
-			const messages = [...this.#channels[i].messages];
-			return count < 0 ? messages : messages.reverse();
-		}
-		return count < 0
-			? this.#channels[i].messages.slice(0, -1 * count).reverse()
-			: this.#channels[i].messages.slice(-1 * count).reverse();
+		const messages = channel.reduce((collection, route, i) => {
+			const channels = this.#getChannelIds(route);
+			if (channels.length > 0) {
+				const messages = channels.reduce((msgs, id) => {
+					const name = this.#getChannelName(id);
+					if (name) {
+						msgs = [...collection, ...this.getMessages(name, count)];
+					}
+					return msgs
+				}, [] as Message[]);
+				collection = [...collection, ...messages];
+			}
+			return collection;
+		}, [] as Message[]);
+
+		return messages.sort((a, b) => {
+			return count < 0
+				? a.timestamp - b.timestamp // recent -> oldest
+				: b.timestamp - a.timestamp; // oldest -> recent
+			})
+			.slice(0, count);
 	}
 
 	/**
@@ -82,6 +111,10 @@ export default class Hub extends EventTarget {
 	 */
 	#getChannelIndex(channel: string) {
 		return this.#channels.findIndex(({name}) => name === channel);
+	}
+
+	#getChannelName(id: number): undefined|string {
+		return this.#channels[id]?.name;
 	}
 
 	/**
@@ -96,5 +129,45 @@ export default class Hub extends EventTarget {
 			return existing;
 		}
 		return this.#channels.push({ name: channel, messages: prepopulate }) - 1;
+	}
+
+	/**
+	 * Whether `match` can be a reference to `channel`.
+	 */
+	#matchChannel(match: ChannelRoute, channel: string): boolean {
+		if ('*' === match) {
+			return true;
+		}
+
+		if (match instanceof RegExp) {
+			return match.test(channel);
+		}
+
+		if (!match.includes('*')) {
+			return match === channel;
+		}
+
+		const hasPrefix = match.endsWith('*')
+			? channel.startsWith(match.substring(0, match.length - 1))
+			: true; // Empty prefix always passes.
+
+		const hasSuffix = match.startsWith('*')
+			? channel.endsWith(match.substring(1))
+			: true; // Empty suffix always passes.
+
+		return hasPrefix && hasSuffix;
+	}
+
+	/**
+	 * Return all channels that can can be matched to `match`.
+	 */
+	#getChannelIds( match: ChannelRoute ): number[] {
+		return this.#channels
+			.reduce((collection, {name}, i) => {
+				if (this.#matchChannel(match, name)) {
+					collection.push(i);
+				}
+				return collection;
+			}, [] as number[]);
 	}
 }
