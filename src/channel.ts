@@ -6,6 +6,8 @@ export type ChannelQuery = {
 	limit?: number;
 }
 
+type SendValue = Message|number;
+
 export default class Channel<Payload extends any> {
 	#messages: Message<Payload>[] = [];
 
@@ -14,24 +16,32 @@ export default class Channel<Payload extends any> {
 	/**
 	 * Push `message` into the channel.
 	 *
-	 * @return {number} The index of this message in `this.messages`.
+	 * @return {number[]} Array of the indexes of all messages inserted, in order of insertion.
 	 */
-	receive(message: Message<Payload>): number {
-		return this.#messages.push(message) - 1;
+	put(...message: Message<Payload>[]): number[] {
+		return message.map(msg => this.#messages.push(msg) - 1);
 	}
 
 	/**
 	 * Push `message` into the channel and broadcast it to `hub`.
 	 *
-	 * @param {Message} message Data to be sent with the event.
 	 * @param {EventTarget} hub Usually this will be a {@link Hub}.
+	 * @param {Message|number} message The {@link Message} to be sent, or the index of a Message already in the Channel to be sent.
 	 *
-	 * @return {number} The index of this message in `this.messages`.
+	 * @return {number[]} Array of the indexes of all messages dispatched, in order of dispatch. A value of `-1` means the Message did not exist.
 	 */
-	broadcast(message: Message<Payload>, hub: EventTarget): number {
-		const i = this.receive(message);
-		hub.dispatchEvent(message);
-		return i;
+	send(hub: EventTarget, ...message: SendValue[]): number[] {
+		return message.map(msg => {
+			if ('number' === typeof msg) {
+				if (!(this.#messages[msg] instanceof Message)) {
+					return -1;
+				}
+				msg = this.#messages[msg];
+			}
+			const [i] = this.put(msg);
+			hub.dispatchEvent(msg);
+			return i;
+		})
 	}
 
 	/**
@@ -53,12 +63,5 @@ export default class Channel<Payload extends any> {
 	 */
 	get messages() {
 		return [...this.#messages];
-	}
-
-	/**
-	 * Returns an array of the payloads from all of this channel's {@link Message}s.
-	 */
-	get payloads() {
-		return this.messages.map(message => message.payload);
 	}
 }

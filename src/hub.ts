@@ -32,14 +32,13 @@ export default class Hub extends EventTarget {
 	/**
 	 * Publish a message to a particular channel.
 	 */
-	pub<Payload extends any = any>(cid: string, payload: Payload) {
+	pub<Payload extends any = any>(cid: string, ...payload: Payload[]) {
 		let channel = this.channels.get(cid);
 		if (!(channel instanceof Channel)) {
 			channel = new Channel(cid);
 			this.channels.set(cid, channel);
 		}
-		const msg = Message.create<Payload>(channel, payload);
-		channel.broadcast(msg, this);
+		channel.send(this, ...payload.map(p => Message.create(channel, p)));
 	}
 
 	/**
