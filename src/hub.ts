@@ -1,8 +1,13 @@
 import Message from './message';
 import Channel, {ChannelQuery} from './channel';
 import {sortByProp} from "./tools";
+import {log} from './logger';
 
 export type ChannelRoute = string | RegExp;
+
+type HubQuery = {
+	cid: ChannelRoute|ChannelRoute[],
+} & ChannelQuery;
 
 export default class Hub extends EventTarget {
 	private channels: Map<string, Channel<any>> = new Map();
@@ -13,19 +18,25 @@ export default class Hub extends EventTarget {
 	 * Returns a method which, when called, will terminate the subscription;
 	 * `callback` will not receive any further messages.
 	 *
+	 * This method attempts to call `listener` for all historical messages
+	 * in the order in which they were received, but it is theoretically
+	 * possible to construct a circumstance in which messages might be
+	 * received out of order. {@link Message#timestamp} will always be greater
+	 * for messages that have been dispatched more recently. However, it is
+	 * a generally good practice for `listener` to be idempotent.
+	 *
 	 * @param {string} channel Name of the channel to subscribe to. Does not need to exist to be subscribed to. Passing `*` will subscribe to all channels.
 	 * @param {function} callback Called with message payload and channel name when a message is published.
 	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription.
 	 */
 	sub<Payload extends any = any>(channel: ChannelRoute, callback: (payload: Payload, channel: Channel<Payload>, unsub: () => void) => void, backlog: number = 0) {
 		const listener = (msg: Event) => {
-			if (!(msg instanceof Message) || !this.#matchChannel(channel, msg.channel.name)) {
-				return;
+			if (msg instanceof Message && this.matchChannel(channel, msg.channel.name)) {
+				callback(msg.payload, msg.channel, () => this.removeEventListener(Message.NAME, listener));
 			}
-			callback(msg.payload, msg.channel, () => this.removeEventListener(Message.NAME, listener));
 		}
-		this.getMessages(channel, {order: 'DESC', limit: backlog}).forEach(listener);
 		this.addEventListener(Message.NAME, listener);
+		this.query({cid: channel, order: 'DESC', limit: backlog}).forEach(listener);
 		return () => this.removeEventListener(Message.NAME, listener);
 	}
 
@@ -57,42 +68,42 @@ export default class Hub extends EventTarget {
 	 *
 	 * Messages are returned in reverse chronological order (most recent -> oldest),
 	 *
-	 * @param {array} cid - A argument (or array of arguments) which can resolve to channel names.
 	 * @param {Object} query - Set of query options for retrieving messages.
+	 * @param {array} query.cid - A argument (or array of arguments) which can resolve to channel names.
+	 * @param {number} [query.limit=1] - The number of messages to return.
 	 * @param {'ASC'|'DESC'} [query.order='DESC'] - Messages are sorted by order of dispatch: `ASC` is oldest -> newest, `DESC` is newest -> oldest.
 	 *
 	 * @return {Message[]} All messages from matching channel(s) which match the `query`. The `Message.channel` property contains a reference to the {@link Channel} that an individual message came from.
 	 */
-	getMessages(cid: ChannelRoute|ChannelRoute[], query: ChannelQuery = {}): Message[] {
+	query(query: HubQuery): Message[] {
 		const {
-			limit,
+			cid,
+			limit = 1,
 			order = 'DESC',
 		} = query;
 
-		if (limit === 0) {
+		if ('undefined' === typeof cid) {
+			log('ERROR', 'No channel identifier provided.');
 			return [];
 		}
 
-		if (!Array.isArray(cid)) {
-			cid = [cid];
+		if (limit === 0) {
+			// This will never result in returning any messages, so save some time.
+			return [];
 		}
 
-		// Compile deduplicated list of channels.
-		const channels = Array.from(cid.reduce((collection, route) => {
+		const routes = Array.isArray(cid) ? cid : [cid];
+
+		const messages = Array.from(routes.reduce((collection, route) => {
 			return collection.union(this.getChannels(route));
-		}, new Set<string>()));
-
-		const messages = channels.reduce((collection, channel) => {
-			const msgs = this.channels.get(channel)?.messages;
-			if (msgs) {
-				collection = sortByProp('timestamp', collection.concat(msgs), order);
-			}
-			return collection;
-		}, [] as Message[])
-
-		if (!limit) {
-			return messages;
-		}
+		}, new Set<string>()))
+			.reduce((collection, channel) => {
+				const msgs = this.channels.get(channel)?.messages;
+				if (msgs) {
+					collection = sortByProp('timestamp', collection.concat(msgs), order);
+				}
+				return collection;
+			}, [] as Message[])
 
 		return messages.slice(0, limit);
 	}
@@ -100,7 +111,7 @@ export default class Hub extends EventTarget {
 	/**
 	 * Whether `match` can be a reference to `channel`.
 	 */
-	#matchChannel(match: ChannelRoute, channel: string): boolean {
+	private matchChannel(match: ChannelRoute, channel: string): boolean {
 		if ('*' === match) {
 			return true;
 		}
@@ -127,13 +138,13 @@ export default class Hub extends EventTarget {
 	/**
 	 * Return a Set of channels tracked by this Hub that match `channel`.
 	 */
-	getChannels(channel: ChannelRoute): Set<string> {
+	private getChannels(channel: ChannelRoute): Set<string> {
 		if ('*' === channel) {
 			return new Set(this.channels.keys());
 		}
 		const channels = new Set<string>();
 		this.channels.keys().forEach(c => {
-			if (this.#matchChannel(channel, c)) {
+			if (this.matchChannel(channel, c)) {
 				channels.add(c);
 			}
 		});

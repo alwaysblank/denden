@@ -8,10 +8,26 @@ export type ChannelQuery = {
 
 type SendValue = Message|number;
 
+/**
+ * Collect and handle {@link Message}s.
+ */
 export default class Channel<Payload extends any> {
 	#messages: Message<Payload>[] = [];
 
-	constructor(public readonly name: string) {}
+	/**
+	 * The name by which this Channel is identified.
+	 *
+	 * Sometimes also referred to as `cid` ("Channel ID").
+	 *
+	 * @see Hub.sub
+	 * @see Hub.pub
+	 * @see Hub.query
+	 */
+	public readonly name: string;
+
+	constructor(name: string) {
+		this.name = name;
+	}
 
 	/**
 	 * Push `message` into the channel.
@@ -26,7 +42,7 @@ export default class Channel<Payload extends any> {
 	 * Push `message` into the channel and broadcast it to `hub`.
 	 *
 	 * @param {EventTarget} hub Usually this will be a {@link Hub}.
-	 * @param {Message|number} message The {@link Message} to be sent, or the index of a Message already in the Channel to be sent.
+	 * @param {...Message|number} message The {@link Message} to be sent, or the index of a Message already in the Channel to be sent. Messages and indices can be interleaved.
 	 *
 	 * @return {number[]} Array of the indexes of all messages dispatched, in order of dispatch. A value of `-1` means the Message did not exist.
 	 */

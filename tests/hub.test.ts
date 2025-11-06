@@ -26,7 +26,7 @@ test('Subscribe and receive multiple', () => {
 	expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
 	expect(callback).toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
 	expect(callback).toHaveBeenCalledWith('salad', {"name": "test"}, expect.any(Function));
-	expect(hub.getMessages('test')).toHaveLength(3);
+	expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(3);
 });
 
 test('Subscribe and receive old', () => {
@@ -40,7 +40,7 @@ test('Subscribe and receive old', () => {
 	hub.pub('test', 'hamburger');
 	hub.pub('test', 'salad');
 	hub.pub('test', 'ice cream');
-	expect(hub.getMessages('test')).toHaveLength(4);
+	expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(4);
 	const callback2items = jest.fn();
 	const callbackAllItems = jest.fn();
 
@@ -75,13 +75,13 @@ test('Subscribe and unsubscribe', () => {
 	hub.pub('test', 'sandwich');
 	expect(callback).toHaveBeenCalledTimes(1);
 	expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
-	expect(hub.getMessages('test')).toHaveLength(1)
+	expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(1)
 	unsub();
 	hub.pub('test', 'hamburger');
 	expect(callback).toHaveBeenCalledTimes(1);
 	expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
 	expect(callback).not.toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
-	expect(hub.getMessages('test')).toHaveLength(2);
+	expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(2);
 
 	const inner = jest.fn();
 	hub.sub('test', (payload, channel, unsub) => {
@@ -117,11 +117,11 @@ test('Watch another event dispatcher', () => {
 	emitter.dispatchEvent(new Event('test'));
 	expect(callback).toHaveBeenCalledTimes(1);
 	expect(callback).toHaveBeenCalledWith('test', {"name": "emitter"}, expect.any(Function));
-	expect(hub.getMessages('emitter')).toHaveLength(1);
+	expect(hub.query({cid:'emitter', limit: Infinity})).toHaveLength(1);
 	unwatch();
 	emitter.dispatchEvent(new Event('test'));
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(hub.getMessages('emitter')).toHaveLength(1);
+	expect(hub.query({cid:'emitter', limit: Infinity})).toHaveLength(1);
 });
 
 test('Get past messages', () => {
@@ -129,13 +129,13 @@ test('Get past messages', () => {
 	hub.pub('test', 'sandwich');
 	hub.pub('test', 'hamburger');
 	hub.pub('test', 'salad');
-	expect(hub.getMessages('test')).toHaveLength(3); // Default is to return all.
-	expect(hub.getMessages('test', {limit: 1})).toHaveLength(1);
-	expect(hub.getMessages('test', {limit: 1, order: 'ASC'})).toHaveLength(1);
-	expect(hub.getMessages('test', {limit: 2})).toHaveLength(2);
-	expect(hub.getMessages('test', {limit: 1})[0].payload).toBe('salad'); // Should return last item.
-	expect(hub.getMessages('test', {limit: 1, order: 'ASC'})[0].payload).toBe('sandwich'); // Should return first item.
-	expect(hub.getMessages('does not exist', {limit: 10})).toStrictEqual([]);
+	expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(3); // Default is to return all.
+	expect(hub.query({cid: 'test', limit: 1})).toHaveLength(1);
+	expect(hub.query({cid: 'test', limit: 1, order: 'ASC'})).toHaveLength(1);
+	expect(hub.query({cid: 'test', limit: 2})).toHaveLength(2);
+	expect(hub.query({cid: 'test', limit: 1})[0].payload).toBe('salad'); // Should return last item.
+	expect(hub.query({cid: 'test', limit: 1, order: 'ASC'})[0].payload).toBe('sandwich'); // Should return first item.
+	expect(hub.query({cid: 'does not exist', limit: 10})).toStrictEqual([]);
 });
 
 test('Subscribe to multiple channels', () => {
@@ -169,7 +169,7 @@ test('Get from multiple channels', () => {
 	hub.pub('test/3', 'test three');
 	hub.pub('sandwich/reuben', ['russian dressing', 'pastrami']);
 
-	const all = hub.getMessages('*');
+	const all = hub.query({cid:'*', limit: Infinity});
 	expect(all).toHaveLength(4);
 	expect(all.map(m => m.payload)).toStrictEqual([
 		['russian dressing', 'pastrami'],
@@ -178,7 +178,7 @@ test('Get from multiple channels', () => {
 		'test one',
 	]);
 
-	const allReverse = hub.getMessages('*', {order: 'ASC'});
+	const allReverse = hub.query({cid: '*', limit: Infinity, order: 'ASC'});
 	expect(allReverse).toHaveLength(4);
 	expect(allReverse.map(m => m.payload)).toStrictEqual([
 		'test one',
@@ -187,7 +187,7 @@ test('Get from multiple channels', () => {
 		['russian dressing', 'pastrami'],
 	]);
 
-	const regex = hub.getMessages( /test\/2|sandwich\/\w+/);
+	const regex = hub.query( {cid: /test\/2|sandwich\/\w+/, limit: Infinity});
 	expect(regex).toHaveLength(2);
 	expect(regex.map(m => m.payload)).toStrictEqual([
 		['russian dressing', 'pastrami'],
