@@ -7,16 +7,14 @@ export type ChannelQuery = {
 }
 
 export default class Channel<Payload extends any> {
-	readonly name: string;
-	#messages: Message<Payload>[];
+	#messages: Message<Payload>[] = [];
 
-	constructor(name: string, messages: Message<Payload>[] = []) {
-		this.name = name;
-		this.#messages = messages;
-	}
+	constructor(public readonly name: string) {}
 
 	/**
 	 * Push `message` into the channel.
+	 *
+	 * @return {number} The index of this message in `this.messages`.
 	 */
 	receive(message: Message<Payload>): number {
 		return this.#messages.push(message) - 1;
@@ -24,8 +22,13 @@ export default class Channel<Payload extends any> {
 
 	/**
 	 * Push `message` into the channel and broadcast it to `hub`.
+	 *
+	 * @param {Message} message Data to be sent with the event.
+	 * @param {EventTarget} hub Usually this will be a {@link Hub}.
+	 *
+	 * @return {number} The index of this message in `this.messages`.
 	 */
-	broadcast(message: Message<Payload>, hub: EventTarget) {
+	broadcast(message: Message<Payload>, hub: EventTarget): number {
 		const i = this.receive(message);
 		hub.dispatchEvent(message);
 		return i;
@@ -38,21 +41,24 @@ export default class Channel<Payload extends any> {
 	 * @param limit Maximum number of messages to return, minimum 1. Default: 1
 	 */
 	query({order = 'DESC', limit}: ChannelQuery): Message[] {
-		let messages = Message.sort(this.messages, order);
+		let messages = sortByProp('timestamp', this.messages, order);
 		if (limit) {
 			messages = messages.slice(0, limit);
 		}
 		return messages;
 	}
 
-	merge(...channels: Channel<Payload>[], order: Required<ChannelQuery['order']>) {
-		const messages = channels.reduce((msgs, {messages}) => {
-			return sortByProp('timestamp', messages.concat(messages), order);
-		}, this.messages);
-	}
-
+	/**
+	 * Returns an array of all {@link Message}s in this channel.
+	 */
 	get messages() {
 		return [...this.#messages];
 	}
 
+	/**
+	 * Returns an array of the payloads from all of this channel's {@link Message}s.
+	 */
+	get payloads() {
+		return this.messages.map(message => message.payload);
+	}
 }

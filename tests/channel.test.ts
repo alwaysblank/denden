@@ -3,9 +3,9 @@ import Message from '../src/message';
 
 test('Respect query() parameters', () => {
 	const channel = new Channel('test');
-	channel.receive(Message.create(channel.name, 'sent first'));
-	channel.receive(Message.create(channel.name, 'sent second'));
-	channel.receive(Message.create(channel.name, 'sent third'));
+	channel.receive(Message.create(channel, 'sent first'));
+	channel.receive(Message.create(channel, 'sent second'));
+	channel.receive(Message.create(channel, 'sent third'));
 
 	expect(channel.query({ order: 'ASC' }).map(msg => msg.payload)).toEqual(['sent first', 'sent second', 'sent third']);
 	expect(channel.query({ order: 'ASC', limit: undefined }).map(msg => msg.payload)).toEqual(['sent first', 'sent second', 'sent third']);

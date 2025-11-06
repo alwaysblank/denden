@@ -1,10 +1,5 @@
 import Hub from '../src/hub';
 import Message from '../src/message';
-import Channel from '../src/channel';
-
-beforeEach(() => {
-	Channel.channels.clear(); // We don't want to track Channels between tests.
-})
 
 test('Create a hub', () => {
 	const hub = new Hub();
@@ -17,7 +12,7 @@ test('Subscribe and receive', () => {
 	hub.sub('test', callback);
 	hub.pub('test', 'sandwich');
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
 });
 
 test('Subscribe and receive multiple', () => {
@@ -28,9 +23,9 @@ test('Subscribe and receive multiple', () => {
 	hub.pub('test', 'hamburger');
 	hub.pub('test', 'salad');
 	expect(callback).toHaveBeenCalledTimes(3);
-	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
-	expect(callback).toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
-	expect(callback).toHaveBeenCalledWith('salad', 'test', expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('salad', {"name": "test"}, expect.any(Function));
 	expect(hub.getMessages('test')).toHaveLength(3);
 });
 
@@ -40,7 +35,7 @@ test('Subscribe and receive old', () => {
 	hub.pub('test', 'sandwich');
 	const unsub1 = hub.sub('test', callback, 1);
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
 	unsub1(); // Remote first sub.
 	hub.pub('test', 'hamburger');
 	hub.pub('test', 'salad');
@@ -48,22 +43,21 @@ test('Subscribe and receive old', () => {
 	expect(hub.getMessages('test')).toHaveLength(4);
 	const callback2items = jest.fn();
 	const callbackAllItems = jest.fn();
-	const callbackNegativeItems = jest.fn();
 
 	hub.sub('test', callback2items, 2);
 	expect(callback2items).toHaveBeenCalledTimes(2);
-	expect(callback2items).toHaveBeenCalledWith('ice cream', 'test', expect.any(Function));
-	expect(callback2items).toHaveBeenCalledWith('salad', 'test', expect.any(Function));
-	expect(callback2items).not.toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
-	expect(callback2items).not.toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
+	expect(callback2items).toHaveBeenCalledWith('ice cream', {"name": "test"}, expect.any(Function));
+	expect(callback2items).toHaveBeenCalledWith('salad', {"name": "test"}, expect.any(Function));
+	expect(callback2items).not.toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
+	expect(callback2items).not.toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
 
 
 	hub.sub('test', callbackAllItems, Infinity);
 	expect(callbackAllItems).toHaveBeenCalledTimes(4);
-	expect(callbackAllItems).toHaveBeenCalledWith('ice cream', 'test', expect.any(Function));
-	expect(callbackAllItems).toHaveBeenCalledWith('salad', 'test', expect.any(Function));
-	expect(callbackAllItems).toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
-	expect(callbackAllItems).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
+	expect(callbackAllItems).toHaveBeenCalledWith('ice cream', {"name": "test"}, expect.any(Function));
+	expect(callbackAllItems).toHaveBeenCalledWith('salad', {"name": "test"}, expect.any(Function));
+	expect(callbackAllItems).toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
+	expect(callbackAllItems).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
 });
 
 test('Subscribe and don\'t receive old', () => {
@@ -80,13 +74,13 @@ test('Subscribe and unsubscribe', () => {
 	const unsub = hub.sub('test', callback);
 	hub.pub('test', 'sandwich');
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
 	expect(hub.getMessages('test')).toHaveLength(1)
 	unsub();
 	hub.pub('test', 'hamburger');
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('sandwich', 'test', expect.any(Function));
-	expect(callback).not.toHaveBeenCalledWith('hamburger', 'test', expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
+	expect(callback).not.toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
 	expect(hub.getMessages('test')).toHaveLength(2);
 
 	const inner = jest.fn();
@@ -122,7 +116,7 @@ test('Watch another event dispatcher', () => {
 	hub.sub('emitter', callback);
 	emitter.dispatchEvent(new Event('test'));
 	expect(callback).toHaveBeenCalledTimes(1);
-	expect(callback).toHaveBeenCalledWith('test', 'emitter', expect.any(Function));
+	expect(callback).toHaveBeenCalledWith('test', {"name": "emitter"}, expect.any(Function));
 	expect(hub.getMessages('emitter')).toHaveLength(1);
 	unwatch();
 	emitter.dispatchEvent(new Event('test'));
@@ -158,13 +152,13 @@ test('Subscribe to multiple channels', () => {
 	hub.pub('test/3', 'test three');
 
 	expect(getAll).toHaveBeenCalledTimes(3);
-	expect(getAll).toHaveBeenCalledWith('test one', 'test/1', expect.any(Function));
-	expect(getAll).toHaveBeenCalledWith('test two', 'test/2', expect.any(Function));
-	expect(getAll).toHaveBeenCalledWith('test three', 'test/3', expect.any(Function));
+	expect(getAll).toHaveBeenCalledWith('test one', {'name':'test/1'}, expect.any(Function));
+	expect(getAll).toHaveBeenCalledWith('test two', {'name':'test/2'}, expect.any(Function));
+	expect(getAll).toHaveBeenCalledWith('test three', {'name':'test/3'}, expect.any(Function));
 	expect(getRegex).toHaveBeenCalledTimes(2);
-	expect(getRegex).toHaveBeenCalledWith('test one', 'test/1', expect.any(Function));
-	expect(getRegex).toHaveBeenCalledWith('test two', 'test/2', expect.any(Function));
-	expect(getRegex).not.toHaveBeenCalledWith('test three', 'test/3', expect.any(Function));
+	expect(getRegex).toHaveBeenCalledWith('test one', {'name':'test/1'}, expect.any(Function));
+	expect(getRegex).toHaveBeenCalledWith('test two', {'name':'test/2'}, expect.any(Function));
+	expect(getRegex).not.toHaveBeenCalledWith('test three', {'name':'test/3'}, expect.any(Function));
 });
 
 test('Get from multiple channels', () => {
