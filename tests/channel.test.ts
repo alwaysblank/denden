@@ -1,12 +1,8 @@
 import Channel from '../src/channel';
 import Message from '../src/message';
 
-beforeEach(() => {
-	Channel.channels.clear(); // We don't want to track Channels between tests.
-});
-
 test('Respect query() parameters', () => {
-	const channel = Channel.get('test');
+	const channel = new Channel('test');
 	channel.receive(Message.create(channel.name, 'sent first'));
 	channel.receive(Message.create(channel.name, 'sent second'));
 	channel.receive(Message.create(channel.name, 'sent third'));
