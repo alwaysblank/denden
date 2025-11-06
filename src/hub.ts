@@ -9,6 +9,9 @@ type HubQuery = {
 	cid: ChannelRoute|ChannelRoute[],
 } & ChannelQuery;
 
+/**
+ * Hub for sending and registering to receive messages.
+ */
 export default class Hub extends EventTarget {
 	private channels: Map<string, Channel<any>> = new Map();
 
@@ -53,7 +56,7 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-	 * Watches the target for an event type, and funnels that into a channel.
+	 * Watch `target` for an event of `eventType`, and then broadcase it to `channel`.
 	 */
 	watch<Payload extends any = any>(channel: string, target: EventTarget, eventType: string, processor: (e: Event) => Payload) {
 		const listener = (e: Event) => {

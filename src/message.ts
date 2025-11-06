@@ -47,14 +47,21 @@ export default class Message<Payload extends any = any> extends Event {
 		this.payload = payload;
 	}
 
+	/**
+	 * Create a new message; this should be used instead of the constructor so that {@link Message#timestamp} is set properly.
+	 */
 	static create<P>(channel: Channel<P>, payload: P): Message<P> {
 		return new Message(channel, payload, performance.now());
 	}
 
+	/**
+	 * Specify how this class should be converted to a JSON object.
+	 */
 	toJSON() {
 		return {
 			channel: this.channel.name,
 			payload: this.payload,
+			timestamp: this.timestamp,
 		}
 	}
 }
