@@ -1,6 +1,6 @@
 import Message from './message';
 import Channel, {ChannelQuery} from './channel';
-import {sortByProp} from "./tools";
+import {match, sortByProp} from "./tools";
 import {log} from './logger';
 
 export type ChannelRoute = string | RegExp;
@@ -34,7 +34,7 @@ export default class Hub extends EventTarget {
 	 */
 	sub<Payload extends any = any>(channel: ChannelRoute, callback: (payload: Payload, channel: Channel<Payload>, unsub: () => void) => void, backlog: number = 0) {
 		const listener = (msg: Event) => {
-			if (msg instanceof Message && this.matchChannel(channel, msg.channel.name)) {
+			if (msg instanceof Message && match(channel, msg.channel.name)) {
 				callback(msg.payload, msg.channel, () => this.removeEventListener(Message.NAME, listener));
 			}
 		}
@@ -98,12 +98,12 @@ export default class Hub extends EventTarget {
 		const routes = Array.isArray(cid) ? cid : [cid];
 
 		const messages = Array.from(routes.reduce((collection, route) => {
-			return collection.union(this.getChannels(route));
+			return collection.union(this.getChannelsBy(route));
 		}, new Set<string>()))
 			.reduce((collection, channel) => {
 				const msgs = this.channels.get(channel)?.messages;
 				if (msgs) {
-					collection = sortByProp('timestamp', collection.concat(msgs), order);
+					collection = sortByProp(collection.concat(msgs), 'timestamp', order);
 				}
 				return collection;
 			}, [] as Message[])
@@ -112,42 +112,15 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-	 * Whether `match` can be a reference to `channel`.
-	 */
-	private matchChannel(match: ChannelRoute, channel: string): boolean {
-		if ('*' === match) {
-			return true;
-		}
-
-		if (match instanceof RegExp) {
-			return match.test(channel);
-		}
-
-		if (!match.includes('*')) {
-			return match === channel;
-		}
-
-		const hasPrefix = match.endsWith('*')
-			? channel.startsWith(match.substring(0, match.length - 1))
-			: true; // Empty prefix always passes.
-
-		const hasSuffix = match.startsWith('*')
-			? channel.endsWith(match.substring(1))
-			: true; // Empty suffix always passes.
-
-		return hasPrefix && hasSuffix;
-	}
-
-	/**
 	 * Return a Set of channels tracked by this Hub that match `channel`.
 	 */
-	private getChannels(channel: ChannelRoute): Set<string> {
+	private getChannelsBy(channel: ChannelRoute): Set<string> {
 		if ('*' === channel) {
 			return new Set(this.channels.keys());
 		}
 		const channels = new Set<string>();
 		this.channels.keys().forEach(c => {
-			if (this.matchChannel(channel, c)) {
+			if (match(channel, c)) {
 				channels.add(c);
 			}
 		});

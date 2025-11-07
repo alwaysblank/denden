@@ -2,7 +2,6 @@ import Channel from '../src/channel';
 import Message from '../src/message';
 
 afterEach(() => {
-    // restore the spy created with spyOn
     jest.restoreAllMocks();
 });
 

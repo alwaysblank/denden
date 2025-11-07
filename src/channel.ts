@@ -70,7 +70,7 @@ export default class Channel<Payload extends any> {
 	 * @param limit Maximum number of messages to return, minimum 1. Default: 1
 	 */
 	query({order = 'DESC', limit}: ChannelQuery): Message[] {
-		let messages = sortByProp('timestamp', this.messages, order);
+		let messages = sortByProp(this.messages, 'timestamp', order);
 		if (limit) {
 			messages = messages.slice(0, limit);
 		}
