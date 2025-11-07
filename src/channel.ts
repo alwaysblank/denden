@@ -48,13 +48,16 @@ export default class Channel<Payload extends any> {
 	 */
 	send(hub: EventTarget, ...message: SendValue[]): number[] {
 		return message.map(msg => {
+            let i = -1;
 			if ('number' === typeof msg) {
 				if (!(this.#messages[msg] instanceof Message)) {
-					return -1;
+                    return i;
 				}
+                i = msg;
 				msg = this.#messages[msg];
-			}
-			const [i] = this.put(msg);
+			} else {
+                [i] = this.put(msg);
+            }
 			hub.dispatchEvent(msg);
 			return i;
 		})
