@@ -34,6 +34,7 @@ export type MatchArgument = RegExp | string;
  * - `*` always matches.
  * - `word*` will match strings that begin with `word`, i.e. `wording`.
  * - `*word` will match strings that end with `word`, i.e. `unword`.
+ * - `*or*` will match nothing; use a regular expression instead.
  * - Strings without a `*`, or that don't begin or end with `*` will be matched only if they are strictly equal to `against`.
  */
 export const match = (match: MatchArgument, against: string) => {
@@ -59,12 +60,10 @@ export const match = (match: MatchArgument, against: string) => {
         : against.startsWith(partial.term);
 }
 
-const reverseString = (str: string) => {
-    return str.split('').reverse().join('');
-}
-
 /**
+ * Given a string `str` in the form of `word*` or `*word` return the search term and whether it is a suffix or not.
  *
+ * @return An object with the `term` and `isSuffix` properties, or boolean `false` if no valid search term can be found.
  */
 const getPartialSearch = (str: string) => {
     if (!str.includes('*')) {
@@ -83,4 +82,11 @@ const getPartialSearch = (str: string) => {
         term: reverse ? reverseString(partial) : partial,
         isSuffix: reverse,
     }
+}
+
+/**
+ * Return a reversed copy of `str`.
+ */
+const reverseString = (str: string) => {
+	return str.split('').reverse().join('');
 }
