@@ -1,4 +1,4 @@
-import {getAffix, match, MatchArgument, reverseString, sortByProp} from '../src/tools';
+import {getAffix, match, reverseString, sortByProp} from '../src/tools';
 
 describe('sortByProp', () => {
    it('should sort by specified prop', () => {
