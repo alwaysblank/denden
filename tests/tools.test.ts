@@ -1,4 +1,4 @@
-import {match, MatchArgument, sortByProp} from "../src/tools";
+import {getAffix, match, MatchArgument, reverseString, sortByProp} from '../src/tools';
 
 describe('sortByProp', () => {
    it('should sort by specified prop', () => {
@@ -44,14 +44,40 @@ describe('sortByProp', () => {
        ]);
    });
 
-   it.each([
-       ['sandwich', 'should', 'sandwich'],
-       ['sand*', 'should', 'sandwich'],
-       ['*wich', 'should', 'sandwich'],
-       [/^s.*h$/, 'should', 'sandwich'],
-       [/^s.*d$/, 'should not', 'sandwich'],
-       ['*dw*', 'should not', 'sandwich'],
-   ])('%p %s match %p', (a: MatchArgument, e: 'should'|'should not', b: string) => {
-       expect(match(a, b)).toBe('should' === e);
-   });
+});
+
+describe('match', () => {
+	it.each([
+		['sandwich', 'should', 'sandwich'],
+		['sand*', 'should', 'sandwich'],
+		['sand', 'should not', 'sandwich'],
+		['*wich', 'should', 'sandwich'],
+		['wich', 'should not', 'sandwich'],
+		[/^s.*h$/, 'should', 'sandwich'],
+		[/^s.*d$/, 'should not', 'sandwich'],
+		['*dw*', 'should not', 'sandwich'],
+		['*', 'should', 'sandwich'],
+	])('%p %s match %p', (a, e, b) => {
+		expect(match(a, b)).toBe('should' === e);
+	});
+});
+
+describe('getAffix', () => {
+	it.each([
+		['sandwich', false],
+		['sand*', {term: 'sand', isSuffix: false}],
+		['*wich', {term: 'wich', isSuffix: true}],
+		['*dw*', false],
+		['*', false],
+	])('"%s" should yield %p', (search, result) => {
+		expect(getAffix(search)).toEqual(result);
+	})
+});
+
+describe('reverseString', () => {
+	it('should reverse the string', () => {
+		const string = 'reuben sandwich';
+		expect(reverseString(string)).toEqual('hciwdnas nebuer');
+		expect(reverseString(reverseString(string))).toEqual('reuben sandwich');
+	});
 });

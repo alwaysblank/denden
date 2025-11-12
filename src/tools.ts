@@ -50,10 +50,11 @@ export const match = (match: MatchArgument, against: string) => {
         return match === against;
     }
 
-    const partial = getPartialSearch(match);
-    if (!partial) {
-        return false;
-    }
+	/**
+	 * Because we've already discarded strings w/o '*', `getPartialSearch`
+	 * cannot return false—hence we can safely use `as` to assert the type.
+	 */
+    const partial = getAffix(match) as {term: string, isSuffix: boolean};
 
     return partial.isSuffix
         ? against.endsWith(partial.term)
@@ -63,10 +64,12 @@ export const match = (match: MatchArgument, against: string) => {
 /**
  * Given a string `str` in the form of `word*` or `*word` return the search term and whether it is a suffix or not.
  *
+ * Terms such as `*` or `*or` will fail because they can't be reduced to a single affix.
+ *
  * @return An object with the `term` and `isSuffix` properties, or boolean `false` if no valid search term can be found.
  */
-const getPartialSearch = (str: string) => {
-    if (!str.includes('*')) {
+export const getAffix = (str: string) => {
+    if (!str.includes('*') || '*' === str) {
         return false;
     }
     let reverse = false;
@@ -74,7 +77,7 @@ const getPartialSearch = (str: string) => {
         str = reverseString(str);
         reverse = true;
     }
-    if (!str.endsWith('*')) {
+    if (!str.endsWith('*') || (str.endsWith('*') && str.startsWith('*'))) {
         return false;
     }
     const partial = str.substring(0, str.length - 1);
@@ -87,6 +90,6 @@ const getPartialSearch = (str: string) => {
 /**
  * Return a reversed copy of `str`.
  */
-const reverseString = (str: string) => {
+export const reverseString = (str: string) => {
 	return str.split('').reverse().join('');
 }
