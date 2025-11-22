@@ -2,9 +2,6 @@ import Hub from '../src/hub';
 import Message from '../src/message';
 import Channel from "../src/channel";
 
-// Once we finalize an approach for logging, this will be used to actually verify log output.
-jest.mock('../src/logger');
-
 afterEach(() => {
     jest.restoreAllMocks();
 });

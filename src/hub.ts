@@ -1,7 +1,6 @@
 import Message from './message';
 import Channel, {ChannelQuery} from './channel';
 import {match, sortByProp} from "./tools";
-import {log} from './logger';
 
 export type ChannelRoute = string | RegExp;
 
@@ -56,7 +55,7 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-	 * Watch `target` for an event of `eventType`, and then broadcase it to `channel`.
+	 * Watch `target` for an event of `eventType`, and then broadcast it to `channel`.
 	 */
 	watch<Payload extends any = any>(channel: string, target: EventTarget, eventType: string, processor: (e: Event) => Payload) {
 		const listener = (e: Event) => {
@@ -86,7 +85,6 @@ export default class Hub extends EventTarget {
 		} = query;
 
 		if ('undefined' === typeof cid) {
-			log('ERROR', 'No channel identifier provided.');
 			return [];
 		}
 
