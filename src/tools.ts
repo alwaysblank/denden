@@ -21,44 +21,42 @@ export const sortByProp = <O>(arr: O[], prop: keyof O, order: 'ASC' | 'DESC') =>
         });
 }
 
-export type MatchArgument = RegExp | string;
-
 /**
- * Test of `match` can be matched against `against`.
+ * Test if `needle` can be matched against `haystack`.
  *
- * If `match` is a regular expression, then JavaScript's RegExp `test()` is used. Note that this is only used if `match`
- * is a RegExp object, *not* of it is a string that looks like a regular expression—a string will be matched with the
+ * If `needle` is a regular expression, then JavaScript's RegExp `test()` is used. Note that this is only used if `needle`
+ * is a RegExp object, *not* if it is a string that looks like a regular expression—a string will be matched with the
  * string rules.
  *
- * If `match` is a string, it is matched against `against` using the following tests:
+ * If `needle` is a string, it is matched against `haystack` using the following tests:
  * - `*` always matches.
- * - `word*` will match strings that begin with `word`, i.e. `wording`.
- * - `*word` will match strings that end with `word`, i.e. `unword`.
- * - `*or*` will match nothing; use a regular expression instead.
- * - Strings without a `*`, or that don't begin or end with `*` will be matched only if they are strictly equal to `against`.
+ * - `word*` will needle strings that begin with `word`, i.e. `wording`.
+ * - `*word` will needle strings that end with `word`, i.e. `unword`.
+ * - `*or*` will needle nothing; use a regular expression instead.
+ * - Strings without a `*`, or that don't begin or end with `*` will be matched only if they are strictly equal to `haystack`.
  */
-export const match = (match: MatchArgument, against: string) => {
-    if ('*' === match) {
+export const match = (needle: RegExp | string, haystack: string) => {
+    if ('*' === needle) {
         return true;
     }
 
-    if (match instanceof RegExp) {
-        return match.test(against);
+    if (needle instanceof RegExp) {
+        return needle.test(haystack);
     }
 
-    if (!match.includes('*')) {
-        return match === against;
+    if (!needle.includes('*')) {
+        return needle === haystack;
     }
 
 	/**
 	 * Because we've already discarded strings w/o '*', `getPartialSearch`
 	 * cannot return false—hence we can safely use `as` to assert the type.
 	 */
-    const partial = getAffix(match) as {term: string, isSuffix: boolean};
+    const partial = getAffix(needle) as {term: string, isSuffix: boolean};
 
     return partial.isSuffix
-        ? against.endsWith(partial.term)
-        : against.startsWith(partial.term);
+        ? haystack.endsWith(partial.term)
+        : haystack.startsWith(partial.term);
 }
 
 /**
