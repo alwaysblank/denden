@@ -52,6 +52,20 @@ export default class Hub extends EventTarget {
 		return (reason?: string) => controller.abort(reason);
 	}
 
+    /**
+     * Run a callback once.
+     *
+     * @param {string} channel Name of the channel to subscribe to. Does not need to exist to be subscribed to. Passing `*` will subscribe to all channels.
+     * @param {function} callback Called with message payload and channel name when a message is published.
+     * @param {boolean} [onlyFuture=false] If `true`, `callback` will fire only for messages dispatched in the future. If `false`, messages in the backlog will also be considered.
+     */
+    once<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, onlyFuture: boolean = false) {
+        return this.sub(channel, (payload, channel, unsub) => {
+            callback(payload, channel, unsub);
+            unsub('Called with once().');
+        }, onlyFuture ? 0 : 1);
+    }
+
 	/**
 	 * Publish a message to a particular channel.
 	 */

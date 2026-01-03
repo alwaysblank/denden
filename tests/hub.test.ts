@@ -157,7 +157,64 @@ describe('Subscribing & Publishing', () => {
         hub.dispatchEvent(msg);
         expect(callback).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledWith('valid message', {'name': 'test'}, expect.any(Function));
-    })
+    });
+
+    it('should run callback only once', () => {
+        const hub = new Hub();
+        const once = jest.fn();
+        const every = jest.fn();
+
+        hub.sub('test', every);
+        hub.once('test', once);
+
+        expect(once).toHaveBeenCalledTimes(0);
+        expect(every).toHaveBeenCalledTimes(0);
+
+        hub.pub('test', 'value');
+
+        expect(once).toHaveBeenCalledTimes(1);
+        expect(every).toHaveBeenCalledTimes(1);
+
+        hub.pub('test', 'value2');
+
+        expect(once).toHaveBeenCalledTimes(1);
+        expect(every).toHaveBeenCalledTimes(2);
+    });
+
+    it('should respect onlyFuture argument when running once', () => {
+        const hub = new Hub();
+        const once = jest.fn();
+        const onceFuture = jest.fn();
+        const every = jest.fn();
+
+        hub.pub('test', 'past');
+
+        expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(1);
+        expect(once).toHaveBeenCalledTimes(0);
+        expect(onceFuture).toHaveBeenCalledTimes(0);
+        expect(every).toHaveBeenCalledTimes(0);
+
+        hub.sub('test', every);
+        hub.once('test', once);
+        hub.once('test', onceFuture, true);
+
+        expect(once).toHaveBeenCalledTimes(1);
+        expect(onceFuture).toHaveBeenCalledTimes(0);
+        expect(every).toHaveBeenCalledTimes(0);
+
+        hub.pub('test', 'new');
+
+        expect(once).toHaveBeenCalledTimes(1);
+        expect(onceFuture).toHaveBeenCalledTimes(1);
+        expect(every).toHaveBeenCalledTimes(1);
+
+        hub.pub('test', 'new');
+
+        expect(once).toHaveBeenCalledTimes(1);
+        expect(onceFuture).toHaveBeenCalledTimes(1);
+        expect(every).toHaveBeenCalledTimes(2);
+
+    });
 });
 
 describe('Other message sources', () => {
