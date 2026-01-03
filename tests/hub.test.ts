@@ -127,7 +127,7 @@ describe('Subscribing & Publishing', () => {
         expect(inner).not.toHaveBeenCalledWith('ice cream');
     });
 
-    test('should allow only valid messages to be sent to a subscriber callback', () => {
+    it('should allow only valid messages to be sent to a subscriber callback', () => {
         const hub = new Hub();
         const callback = jest.fn();
         hub.sub('test', callback)

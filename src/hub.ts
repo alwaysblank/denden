@@ -4,6 +4,8 @@ import {match, sortByProp} from "./tools";
 
 export type ChannelRoute = string | RegExp;
 
+export type Callback<Payload> = (payload: Payload, channel: Channel<Payload>, unsub: (reason?: string) => void) => void;
+
 type HubQuery = {
 	cid: ChannelRoute|ChannelRoute[],
 } & ChannelQuery;
@@ -18,7 +20,9 @@ export default class Hub extends EventTarget {
 	 * Listen to messages sent to a particular channel.
 	 *
 	 * Returns a method which, when called, will terminate the subscription;
-	 * `callback` will not receive any further messages.
+	 * `callback` will not receive any further messages. Optionally, this
+     * `usub` method takes a string argument, indicating why we have
+     * unsubscribed from this channel. (Currently this is not accessible.)
 	 *
 	 * This method attempts to call `listener` for all historical messages
 	 * in the order in which they were received, but it is theoretically
@@ -31,15 +35,21 @@ export default class Hub extends EventTarget {
 	 * @param {function} callback Called with message payload and channel name when a message is published.
 	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription.
 	 */
-	sub<Payload extends any = any>(channel: ChannelRoute, callback: (payload: Payload, channel: Channel<Payload>, unsub: () => void) => void, backlog: number = 0) {
+	sub<Payload extends any = any>(channel: ChannelRoute, callback: Callback<Payload>, backlog: number = 0) {
+        const controller = new AbortController();
 		const listener = (msg: Event) => {
 			if (msg instanceof Message && match(channel, msg.channel.name)) {
-				callback(msg.payload, msg.channel, () => this.removeEventListener(Message.NAME, listener));
+				callback(msg.payload, msg.channel, (reason?: string) => controller.abort(reason));
 			}
 		}
-		this.addEventListener(Message.NAME, listener);
-		this.query({cid: channel, order: 'DESC', limit: backlog}).forEach(listener);
-		return () => this.removeEventListener(Message.NAME, listener);
+		this.addEventListener(Message.NAME, listener, {signal: controller.signal});
+        for (const m of this.query({cid: channel, order: 'DESC', limit: backlog})) {
+            if (controller.signal.aborted) {
+                break;
+            }
+            listener(m);
+        }
+		return (reason?: string) => controller.abort(reason);
 	}
 
 	/**
