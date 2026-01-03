@@ -215,6 +215,125 @@ describe('Subscribing & Publishing', () => {
         expect(every).toHaveBeenCalledTimes(2);
 
     });
+
+    it('should respect only() condition', () => {
+       const hub = new Hub();
+       const cond = jest.fn();
+       const every = jest.fn();
+
+       const onlyConditional = (payload: string) => {
+           return payload === 'sandwich';
+       }
+
+       expect(cond).toHaveBeenCalledTimes(0);
+       expect(every).toHaveBeenCalledTimes(0);
+
+       hub.only('test', cond, onlyConditional);
+       hub.sub('test', every);
+
+       hub.pub('test', 'burrito');
+       hub.pub('test', 'sandwich');
+       hub.pub('test', 'pizza');
+
+       expect(every).toHaveBeenCalledTimes(3);
+       expect(cond).toHaveBeenCalledTimes(1);
+       expect(cond).toHaveBeenCalledWith('sandwich', {name: 'test'}, expect.any(Function));
+    });
+
+    it('should respect only() condition and onlyFuture', () => {
+        const hub = new Hub();
+        const future = jest.fn();
+        const cond = jest.fn();
+        const every = jest.fn();
+
+        const onlyConditional = (payload: string) => {
+            return payload === 'sandwich' || payload === 'pizza';
+        }
+
+        expect(future).toHaveBeenCalledTimes(0);
+        expect(cond).toHaveBeenCalledTimes(0);
+        expect(every).toHaveBeenCalledTimes(0);
+
+        hub.pub('test', 'pizza');
+
+        hub.only('test', future, onlyConditional, true);
+        hub.only('test', cond, onlyConditional);
+        hub.sub('test', every);
+
+        hub.pub('test', 'burrito');
+        hub.pub('test', 'sandwich');
+
+        expect(every).toHaveBeenCalledTimes(2);
+        expect(future).toHaveBeenCalledTimes(1);
+        expect(future).toHaveBeenCalledWith('sandwich', {name: 'test'}, expect.any(Function));
+        expect(cond).toHaveBeenCalledTimes(2);
+        expect(cond).toHaveBeenCalledWith('pizza', {name: 'test'}, expect.any(Function));
+        expect(cond).toHaveBeenCalledWith('sandwich', {name: 'test'}, expect.any(Function));
+    });
+
+    it('should stop when until() condition is met', () => {
+       const hub = new Hub();
+       const until = jest.fn();
+       const every = jest.fn();
+
+       const untilConditional = (payload: number) => {
+           return payload > 1;
+       }
+
+       expect(until).toHaveBeenCalledTimes(0);
+       expect(every).toHaveBeenCalledTimes(0);
+
+       hub.until('test', until, untilConditional);
+       hub.sub('test', every);
+
+       expect(until).toHaveBeenCalledTimes(0);
+       expect(every).toHaveBeenCalledTimes(0);
+
+       hub.pub('test', 0);
+       expect(until).toHaveBeenCalledTimes(1);
+       expect(every).toHaveBeenCalledTimes(1);
+
+       hub.pub('test', 1);
+       expect(until).toHaveBeenCalledTimes(2);
+       expect(every).toHaveBeenCalledTimes(2);
+
+        hub.pub('test', 2);
+        expect(until).toHaveBeenCalledTimes(2);
+        expect(every).toHaveBeenCalledTimes(3);
+
+        hub.pub('test', 3);
+        expect(until).toHaveBeenCalledTimes(2);
+        expect(every).toHaveBeenCalledTimes(4);
+    });
+
+    it('should stop when until() condition is met (high start)', () => {
+        const hub = new Hub();
+        const until = jest.fn();
+        const every = jest.fn();
+
+        const untilConditional = (payload: number) => {
+            return payload > 1;
+        }
+
+        expect(until).toHaveBeenCalledTimes(0);
+        expect(every).toHaveBeenCalledTimes(0);
+
+        hub.until('test', until, untilConditional);
+        hub.sub('test', every);
+
+        expect(until).toHaveBeenCalledTimes(0);
+        expect(every).toHaveBeenCalledTimes(0);
+
+        hub.pub('test', 10);
+
+        expect(until).toHaveBeenCalledTimes(0);
+        expect(every).toHaveBeenCalledTimes(1);
+
+        hub.pub('test', 0);
+
+        expect(until).toHaveBeenCalledTimes(0);
+        expect(every).toHaveBeenCalledTimes(2);
+    });
 });
 
 describe('Other message sources', () => {

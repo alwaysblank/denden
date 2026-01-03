@@ -66,6 +66,31 @@ export default class Hub extends EventTarget {
         }, onlyFuture ? 0 : 1);
     }
 
+    /**
+     * Run callback only if `test` evaluates to `true`.
+     */
+    only<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, test: (payload: Payload, Channel: Channel<Payload>) => boolean, onlyFuture: boolean = false) {
+        return this.sub(channel, (payload, channel, unsub) => {
+            if (!test(payload, channel)) {
+                return;
+            }
+            callback(payload, channel, unsub);
+        }, onlyFuture ? 0 : 1);
+    }
+
+    /**
+     * Remove subscription when `test` evaluates to `true`.
+     */
+    until<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, test: (payload: Payload, channel: Channel<Payload>) => boolean, onlyFuture: boolean = false) {
+        return this.sub(channel, (payload, channel, unsub) => {
+            if (test(payload, channel)) {
+                unsub('Met until() condition.');
+                return;
+            }
+            callback(payload, channel, unsub);
+        }, onlyFuture ? 0 : 1);
+    }
+
 	/**
 	 * Publish a message to a particular channel.
 	 */
