@@ -1,6 +1,69 @@
 import Hub from '../src/hub';
 import Message from '../src/message';
 import Channel from "../src/channel";
+import {describe, expect, test} from '@jest/globals';
+
+const toBeMessageFromChannel = (actual: unknown, payload: unknown, channel: string) => {
+    if (!(actual instanceof Message)) {
+        throw new TypeError('Expected a message but got something else!');
+    }
+    const pass = actual.payload === payload && actual.channel.name === channel;
+    const errorMessage = () => {
+        const errors = [];
+        if (actual.payload !== payload) {
+            errors.push(`expected ${JSON.stringify(payload)}, got ${JSON.stringify(actual.payload)}`);
+        }
+        if (actual.channel.name !== channel) {
+            errors.push(`expected ${channel}, got ${actual.channel.name}`);
+        }
+        return errors.join(';');
+    }
+    if (pass) {
+        return {
+            message: errorMessage,
+            pass: true,
+        }
+    } else {
+        return {
+            message: errorMessage,
+            pass: false,
+        }
+    }
+}
+
+const toHaveChannel = (actual: Partial<{channel: {name: string}}>, channel: string) => {
+    const actualChannel = actual?.channel?.name;
+    const errMsg = () => {
+        return `expected ${channel}, got ${actualChannel || 'no channel found'}`;
+    }
+    if (actualChannel === channel) {
+        return {
+            message: errMsg,
+            pass: true,
+        }
+    }
+    return {
+        message: errMsg,
+        pass: false,
+    }
+}
+
+expect.extend({
+    toBeMessageFromChannel,
+    toHaveChannel,
+});
+
+declare module 'expect' {
+    interface AsymmetricMatchers {
+        toBeMessageFromChannel(payload: unknown, channel: string): void;
+        toHaveChannel(channel: string): void;
+    }
+    interface Matchers<R> {
+        toBeMessageFromChannel(payload: unknown, channel: string): R;
+        toHaveChannel(channel: string): R;
+    }
+}
+
 
 afterEach(() => {
     jest.restoreAllMocks();
@@ -20,7 +83,7 @@ describe('Subscribing & Publishing', () => {
         hub.sub('test', callback);
         hub.pub('test', 'sandwich');
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
     });
 
     it('should receive multiple published messages', () => {
@@ -31,9 +94,9 @@ describe('Subscribing & Publishing', () => {
         hub.pub('test', 'hamburger');
         hub.pub('test', 'salad');
         expect(callback).toHaveBeenCalledTimes(3);
-        expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
-        expect(callback).toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
-        expect(callback).toHaveBeenCalledWith('salad', {"name": "test"}, expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
         expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(3);
     });
 
@@ -51,13 +114,13 @@ describe('Subscribing & Publishing', () => {
         hub.pub('test/3', 'test three');
 
         expect(getAll).toHaveBeenCalledTimes(3);
-        expect(getAll).toHaveBeenCalledWith('test one', {'name':'test/1'}, expect.any(Function));
-        expect(getAll).toHaveBeenCalledWith('test two', {'name':'test/2'}, expect.any(Function));
-        expect(getAll).toHaveBeenCalledWith('test three', {'name':'test/3'}, expect.any(Function));
+        expect(getAll).toHaveBeenCalledWith('test one', expect.toHaveChannel('test/1'), expect.any(Function));
+        expect(getAll).toHaveBeenCalledWith('test two', expect.toHaveChannel('test/2'), expect.any(Function));
+        expect(getAll).toHaveBeenCalledWith('test three', expect.toHaveChannel('test/3'), expect.any(Function));
         expect(getRegex).toHaveBeenCalledTimes(2);
-        expect(getRegex).toHaveBeenCalledWith('test one', {'name':'test/1'}, expect.any(Function));
-        expect(getRegex).toHaveBeenCalledWith('test two', {'name':'test/2'}, expect.any(Function));
-        expect(getRegex).not.toHaveBeenCalledWith('test three', {'name':'test/3'}, expect.any(Function));
+        expect(getRegex).toHaveBeenCalledWith('test one', expect.toHaveChannel('test/1'), expect.any(Function));
+        expect(getRegex).toHaveBeenCalledWith('test two', expect.toHaveChannel('test/2'), expect.any(Function));
+        expect(getRegex).not.toHaveBeenCalledWith('test three', expect.toHaveChannel('test/3'), expect.any(Function));
     });
 
 
@@ -67,7 +130,7 @@ describe('Subscribing & Publishing', () => {
         hub.pub('test', 'sandwich');
         const unsub1 = hub.sub('test', callback, 1);
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
         unsub1(); // Remote first sub.
         hub.pub('test', 'hamburger');
         hub.pub('test', 'salad');
@@ -78,18 +141,18 @@ describe('Subscribing & Publishing', () => {
 
         hub.sub('test', callback2items, 2);
         expect(callback2items).toHaveBeenCalledTimes(2);
-        expect(callback2items).toHaveBeenCalledWith('ice cream', {"name": "test"}, expect.any(Function));
-        expect(callback2items).toHaveBeenCalledWith('salad', {"name": "test"}, expect.any(Function));
-        expect(callback2items).not.toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
-        expect(callback2items).not.toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
+        expect(callback2items).toHaveBeenCalledWith('ice cream', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callback2items).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callback2items).not.toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callback2items).not.toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
 
 
         hub.sub('test', callbackAllItems, Infinity);
         expect(callbackAllItems).toHaveBeenCalledTimes(4);
-        expect(callbackAllItems).toHaveBeenCalledWith('ice cream', {"name": "test"}, expect.any(Function));
-        expect(callbackAllItems).toHaveBeenCalledWith('salad', {"name": "test"}, expect.any(Function));
-        expect(callbackAllItems).toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
-        expect(callbackAllItems).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
+        expect(callbackAllItems).toHaveBeenCalledWith('ice cream', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callbackAllItems).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callbackAllItems).toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callbackAllItems).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
     });
 
     it('should receive no previously published messages by default', () => {
@@ -106,13 +169,13 @@ describe('Subscribing & Publishing', () => {
         const unsub = hub.sub('test', callback);
         hub.pub('test', 'sandwich');
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
         expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(1)
         unsub();
         hub.pub('test', 'hamburger');
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('sandwich', {"name": "test"}, expect.any(Function));
-        expect(callback).not.toHaveBeenCalledWith('hamburger', {"name": "test"}, expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
+        expect(callback).not.toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
         expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(2);
 
         const inner = jest.fn();
@@ -156,7 +219,7 @@ describe('Subscribing & Publishing', () => {
         // We finally send a valid message!
         hub.dispatchEvent(msg);
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('valid message', {'name': 'test'}, expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('valid message', expect.toHaveChannel('test'), expect.any(Function));
     });
 
     it('should run callback only once', () => {
@@ -237,7 +300,7 @@ describe('Subscribing & Publishing', () => {
 
        expect(every).toHaveBeenCalledTimes(3);
        expect(cond).toHaveBeenCalledTimes(1);
-       expect(cond).toHaveBeenCalledWith('sandwich', {name: 'test'}, expect.any(Function));
+       expect(cond).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
     });
 
     it('should respect only() condition and onlyFuture', () => {
@@ -265,10 +328,10 @@ describe('Subscribing & Publishing', () => {
 
         expect(every).toHaveBeenCalledTimes(2);
         expect(future).toHaveBeenCalledTimes(1);
-        expect(future).toHaveBeenCalledWith('sandwich', {name: 'test'}, expect.any(Function));
+        expect(future).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
         expect(cond).toHaveBeenCalledTimes(2);
-        expect(cond).toHaveBeenCalledWith('pizza', {name: 'test'}, expect.any(Function));
-        expect(cond).toHaveBeenCalledWith('sandwich', {name: 'test'}, expect.any(Function));
+        expect(cond).toHaveBeenCalledWith('pizza', expect.toHaveChannel('test'), expect.any(Function));
+        expect(cond).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
     });
 
     it('should stop when until() condition is met', () => {
@@ -345,7 +408,7 @@ describe('Other message sources', () => {
         hub.sub('emitter', callback);
         emitter.dispatchEvent(new Event('test'));
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('test', {"name": "emitter"}, expect.any(Function));
+        expect(callback).toHaveBeenCalledWith('test', expect.toHaveChannel('emitter'), expect.any(Function));
         expect(hub.query({cid:'emitter', limit: Infinity})).toHaveLength(1);
         unwatch();
         emitter.dispatchEvent(new Event('test'));

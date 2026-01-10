@@ -4,7 +4,7 @@ import {match, sortByProp} from "./tools";
 
 export type ChannelRoute = string | RegExp;
 
-export type Callback<Payload> = (payload: Payload, channel: Channel<Payload>, unsub: (reason?: string) => void) => void;
+export type Callback<Payload> = (payload: Payload, message: Message<Payload>, unsub: (reason?: string) => void) => void;
 
 type HubQuery = {
 	cid: ChannelRoute|ChannelRoute[],
@@ -39,7 +39,7 @@ export default class Hub extends EventTarget {
         const controller = new AbortController();
 		const listener = (msg: Event) => {
 			if (msg instanceof Message && match(channel, msg.channel.name)) {
-				callback(msg.payload, msg.channel, (reason?: string) => controller.abort(reason));
+				callback(msg.payload, msg, (reason?: string) => controller.abort(reason));
 			}
 		}
 		this.addEventListener(Message.NAME, listener, {signal: controller.signal});
@@ -60,8 +60,8 @@ export default class Hub extends EventTarget {
      * @param {boolean} [onlyFuture=false] If `true`, `callback` will fire only for messages dispatched in the future. If `false`, messages in the backlog will also be considered.
      */
     once<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, onlyFuture: boolean = false) {
-        return this.sub(channel, (payload, channel, unsub) => {
-            callback(payload, channel, unsub);
+        return this.sub<Payload>(channel, (payload, message, unsub) => {
+            callback(payload, message, unsub);
             unsub('Called with once().');
         }, onlyFuture ? 0 : 1);
     }
@@ -69,25 +69,25 @@ export default class Hub extends EventTarget {
     /**
      * Run callback only if `test` evaluates to `true`.
      */
-    only<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, test: (payload: Payload, Channel: Channel<Payload>) => boolean, onlyFuture: boolean = false) {
-        return this.sub(channel, (payload, channel, unsub) => {
-            if (!test(payload, channel)) {
+    only<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, test: (payload: Payload, message: Message<Payload>) => boolean, onlyFuture: boolean = false) {
+        return this.sub<Payload>(channel, (payload, message, unsub) => {
+            if (!test(payload, message)) {
                 return;
             }
-            callback(payload, channel, unsub);
+            callback(payload, message, unsub);
         }, onlyFuture ? 0 : 1);
     }
 
     /**
      * Remove subscription when `test` evaluates to `true`.
      */
-    until<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, test: (payload: Payload, channel: Channel<Payload>) => boolean, onlyFuture: boolean = false) {
-        return this.sub(channel, (payload, channel, unsub) => {
-            if (test(payload, channel)) {
+    until<Payload extends any>(channel: ChannelRoute, callback: Callback<Payload>, test: (payload: Payload, message: Message<Payload>) => boolean, onlyFuture: boolean = false) {
+        return this.sub(channel, (payload, message, unsub) => {
+            if (test(payload, message)) {
                 unsub('Met until() condition.');
                 return;
             }
-            callback(payload, channel, unsub);
+            callback(payload, message, unsub);
         }, onlyFuture ? 0 : 1);
     }
 
