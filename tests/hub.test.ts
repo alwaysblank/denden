@@ -1,7 +1,7 @@
 import Hub from '../src/hub';
 import Message from '../src/message';
 import Channel from "../src/channel";
-import {describe, expect, test} from '@jest/globals';
+import {describe, expect} from '@jest/globals';
 
 const toBeMessageFromChannel = (actual: unknown, payload: unknown, channel: string) => {
     if (!(actual instanceof Message)) {
@@ -163,7 +163,7 @@ describe('Subscribing & Publishing', () => {
         expect(callback).toHaveBeenCalledTimes(0);
     });
 
-    test('should allow unsubscribing from a channel, preventing any further callbacks', () => {
+    it('should allow unsubscribing from a channel, preventing any further callbacks', () => {
         const hub = new Hub();
         const callback = jest.fn();
         const unsub = hub.sub('test', callback);
@@ -189,6 +189,32 @@ describe('Subscribing & Publishing', () => {
         expect(inner).toHaveBeenCalledWith('salad');
         expect(inner).not.toHaveBeenCalledWith('ice cream');
     });
+
+    it('should allow unsubscribing while parsing previous message', () => {
+        const hub = new Hub();
+        const once = jest.fn();
+        const all = jest.fn();
+        hub.pub('test', 'sandwich');
+        hub.pub('test', 'hamburger');
+        hub.pub('test', 'salad');
+
+        let i = 0;
+        hub.sub('test', (payload, channel, unsub) => {
+            if (i++ > 0) {
+                return unsub();
+            }
+            once(payload, channel, unsub);
+        }, 3);
+        hub.sub('test', all, 4);
+
+        expect(once).toHaveBeenCalledTimes(1);
+        expect(once).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
+
+        expect(all).toHaveBeenCalledTimes(3);
+        expect(all).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
+        expect(all).toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
+        expect(all).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
+    })
 
     it('should allow only valid messages to be sent to a subscriber callback', () => {
         const hub = new Hub();
