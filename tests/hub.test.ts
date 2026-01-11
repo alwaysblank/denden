@@ -3,34 +3,6 @@ import Message from '../src/message';
 import Channel from "../src/channel";
 import {describe, expect} from '@jest/globals';
 
-const toBeMessageFromChannel = (actual: unknown, payload: unknown, channel: string) => {
-    if (!(actual instanceof Message)) {
-        throw new TypeError('Expected a message but got something else!');
-    }
-    const pass = actual.payload === payload && actual.channel.name === channel;
-    const errorMessage = () => {
-        const errors = [];
-        if (actual.payload !== payload) {
-            errors.push(`expected ${JSON.stringify(payload)}, got ${JSON.stringify(actual.payload)}`);
-        }
-        if (actual.channel.name !== channel) {
-            errors.push(`expected ${channel}, got ${actual.channel.name}`);
-        }
-        return errors.join(';');
-    }
-    if (pass) {
-        return {
-            message: errorMessage,
-            pass: true,
-        }
-    } else {
-        return {
-            message: errorMessage,
-            pass: false,
-        }
-    }
-}
-
 const toHaveChannel = (actual: Partial<{channel: {name: string}}>, channel: string) => {
     const actualChannel = actual?.channel?.name;
     const errMsg = () => {
@@ -49,7 +21,6 @@ const toHaveChannel = (actual: Partial<{channel: {name: string}}>, channel: stri
 }
 
 expect.extend({
-    toBeMessageFromChannel,
     toHaveChannel,
 });
 
