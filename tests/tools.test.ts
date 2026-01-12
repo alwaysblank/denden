@@ -29,6 +29,22 @@ describe('sortByProp', () => {
        ]);
    });
 
+   it('should sort floats correctly', () => {
+       const arr = [
+           {n: performance.now(), m: 'one'},
+           {n: performance.now(), m: 'two'},
+           {n: performance.now(), m: 'three'},
+           {n: performance.now(), m: 'four'},
+       ];
+
+       const ascending = sortByProp(arr, 'n', 'ASC');
+       const descending = sortByProp(arr, 'n', 'DESC');
+
+       expect(ascending).toStrictEqual(arr);
+       expect(descending).not.toStrictEqual(arr);
+       expect(descending).toStrictEqual(arr.toReversed());
+   });
+
    it('should ignore non-numeric values', () => {
        const arr = [
            {n: 3},
@@ -57,6 +73,12 @@ describe('match', () => {
 		[/^s.*d$/, 'should not', 'sandwich'],
 		['*dw*', 'should not', 'sandwich'],
 		['*', 'should', 'sandwich'],
+        [['*'], 'should', 'sandwich'],
+        [[/^s.*d$/, '*wich'], 'should', 'sandwich'],
+        [[/^s.*d$/, 'wich'], 'should not', 'sandwich'],
+        [['sand*', '*wich'], 'should', 'sandwich'],
+        [['sand*', 'sand*'], 'should', 'sandwich'],
+        [['burger', 'sandwich'], 'should', 'sandwich'],
 	])('%p %s match %p', (a, e, b) => {
 		expect(match(a, b)).toBe('should' === e);
 	});

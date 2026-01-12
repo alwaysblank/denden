@@ -1,57 +1,77 @@
-import Channel from "./channel";
-
+import {Hub} from './hub';
 /**
  * An Event carrying some kind of data.
+ *
+ * @template Payload Type of data carried by this message.
  */
-export default class Message<Payload extends any = any> extends Event {
-	static NAME = 'ddm';
+export class Message<Payload extends any = any> extends Event {
+	static NAME = 'ddm::event::message';
+	static #order: number = 0;
 
 	/**
-	 * A value used to order messages by dispatch time.
-	 *
-	 * This value is *not* a date/time value and should be used only for
-	 * ordering purposes.
+	 * A value used to order messages.
 	 *
 	 * Strictly speaking, it is set on Message creation, not on Message
 	 * dispatch, but when using the methods {@link Hub.pub} or {@link Hub.watch}
 	 * Messages are created at the time of dispatch.
 	 */
-	public readonly timestamp: number;
+	public readonly order: number;
 
 	/**
-	 * The payload being carried by this Message; can be any kind of data.
+	 * An object containing the payload.
+	 *
+	 * Generally you don't want to access this; you want to access {@link payload}.
+	 * This is an object because we want to be able to use it as a unique
+	 * identifier for Messages. Different messages would have the same scalar
+	 * payload but be meaningfully distinct. Object equality in JS, however,
+	 * means that ever object can be distinct, even if the actual payloads are
+	 * the same.
 	 */
-	public readonly payload: Payload;
+	public readonly contains: {payload: Payload};
 
 	/**
-	 * The {@link Channel} on which this Message was originally dispatched.
+	 * The channel on which this Message was originally dispatched.
 	 *
 	 * This can be relevant because in some situations (i.e. when calling
-	 * {@link Hub.query} or {@link Hub.sub}) Messages can be returned from
+	 * {@link Hub.getMessages Hub.getMessages()} or {@link Hub.sub}) Messages can be returned from
 	 * across several channels.
 	 */
-	public readonly channel: Channel<Payload>;
+	public readonly channel: string;
 
 	/**
-	 * To create a message outside of this class, call `Message.create()` which will automatically set `timestamp` to an appropriate value.
+	 * If manually creating a message outside of a Hub, using {@link Message.create} is easier to use.
 	 *
-	 * @param channel The channel on which this message is *originally* to be dispatched.
-	 * @param payload Data carried by this message.
-	 * @param timestamp An internal value used to sort messages in their order of creation. *Not* a representation of date-time.
-	 * @private
+	 * The constructor allows you to directly specify the {@link Message.contains}
+	 * object, which may be useful if creating multiple Messages across different
+	 * channels with the same payload.
+	 *
+	 * @param channel Name of the channel on which this message is *originally* to be dispatched.
+	 * @param payload Object containing the payload.
 	 */
-	private constructor(channel: Channel<Payload>, payload: Payload, timestamp: number) {
+	constructor(channel: string, payload: {payload: Payload}) {
 		super(Message.NAME, {bubbles: false});
-		this.timestamp = timestamp;
+		this.order = Message.#order++;
 		this.channel = channel;
-		this.payload = payload;
+		this.contains = payload;
 	}
 
 	/**
-	 * Create a new message; this should be used instead of the constructor so that {@link Message#timestamp} is set properly.
+	 * The data being carried by this message.
 	 */
-	static create<P>(channel: Channel<P>, payload: P): Message<P> {
-		return new Message(channel, payload, performance.now());
+	get payload(): Payload {
+		return this.contains.payload;
+	}
+
+	/**
+	 * Create a new Message.
+	 *
+	 * @param channel The  on which this message is *originally* to be dispatched.
+	 * @param payload The data being carried by this message.
+	 *
+	 * @template Payload Type of data carried by this message.
+	 */
+	static create<Payload extends any>(channel: string, payload: Payload): Message<Payload> {
+		return new Message(channel, {payload});
 	}
 
 	/**
@@ -59,9 +79,9 @@ export default class Message<Payload extends any = any> extends Event {
 	 */
 	toJSON() {
 		return {
-			channel: this.channel.name,
+			channel: this.channel,
 			payload: this.payload,
-			timestamp: this.timestamp,
+			order: this.order,
 		}
 	}
 }

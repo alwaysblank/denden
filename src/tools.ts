@@ -1,3 +1,8 @@
+import type {Hub} from './hub';
+
+export type OmitFirstArg<F> = F extends (x: any, ...args: infer P) => infer R ? (...args: P) => R : never;
+
+
 /**
  * Sort an array of objects by one of their properties (must be numeric) in ascending or descending order.
  *
@@ -21,6 +26,8 @@ export const sortByProp = <O>(arr: O[], prop: keyof O, order: 'ASC' | 'DESC') =>
         });
 }
 
+export type MatchNeedle = string | RegExp | Array<string|RegExp>;
+
 /**
  * Test if `needle` can be matched against `haystack`.
  *
@@ -35,9 +42,13 @@ export const sortByProp = <O>(arr: O[], prop: keyof O, order: 'ASC' | 'DESC') =>
  * - `*or*` will needle nothing; use a regular expression instead.
  * - Strings without a `*`, or that don't begin or end with `*` will be matched only if they are strictly equal to `haystack`.
  */
-export const match = (needle: RegExp | string, haystack: string) => {
+export const match = (needle: MatchNeedle, haystack: string): boolean => {
     if ('*' === needle) {
         return true;
+    }
+
+    if (Array.isArray(needle)) {
+        return needle.some((n) => match(n, haystack));
     }
 
     if (needle instanceof RegExp) {
@@ -90,4 +101,48 @@ export const getAffix = (str: string) => {
  */
 export const reverseString = (str: string) => {
 	return str.split('').reverse().join('');
+}
+
+/**
+ * Returns a version of {@link func} which returns a Promise rather than expecting a callback.
+ *
+ * @example
+ * const fn = (callback, a, b) => doSomething(callback, a, b);
+ * const promised = asPromise(fn);
+ * promised(1, 2).then(result => console.log(result));
+ *
+ * @param func Function that expects a callback as its first argument.
+ *
+ * @template A The argument that will be passed to the callback.
+ * @template F The type of {@link func}.
+ */
+export function asPromise<A, F extends (callback: (a: A) => any, ...args: any[]) => any>(func: F) {
+	return (...args: Parameters<OmitFirstArg<F>>) => {
+		return new Promise<A>((resolve) => {
+			func(a => resolve(a), ...args);
+		})
+	}
+}
+
+/**
+ * Returns a version of {@link func} which that is bound to {@link hub}, and therefore does not need to specify the hub to use.
+ *
+ * @example
+ * const hub = new Hub();
+ * latest(hub, callback, 'test', 100);
+ * // With withHub:
+ * const waiter = withHub(hub, latest);
+ * waiter(callback, 'test', 100);
+ *
+ * @param hub The {@link Hub} instance to which this function will be bound.
+ * @param func The function to be bound.
+ *
+ * @template Args Arguments passed to {@link func}.
+ * @template R Return type of {@link func}.
+ */
+export function withHub<Args extends any[], R>(
+	hub: Hub,
+	func: (hub: Hub, ...args: Args) => R
+): ((...args: Args) => R) {
+	return (...args: Args) => func(hub, ...args);
 }
