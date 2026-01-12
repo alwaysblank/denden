@@ -34,15 +34,16 @@ export default class Hub extends EventTarget {
 	 * @param {string} channel Name of the channel to subscribe to. Does not need to exist to be subscribed to. Passing `*` will subscribe to all channels.
 	 * @param {function} callback Called with message payload and channel name when a message is published.
 	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription.
+     * @param {AddEventListenerOptions} [listenerOptions={}] Options passed directly to `addEventListener()`. **Use with caution.**
 	 */
-	sub<Payload extends any = any>(channel: ChannelRoute, callback: Callback<Payload>, backlog: number = 0) {
+	sub<Payload extends any = any>(channel: ChannelRoute, callback: Callback<Payload>, backlog: number = 0, listenerOptions: AddEventListenerOptions = {} ) {
         const controller = new AbortController();
 		const listener = (msg: Event) => {
 			if (msg instanceof Message && match(channel, msg.channel.name)) {
 				callback(msg.payload, msg, (reason?: string) => controller.abort(reason));
 			}
 		}
-		this.addEventListener(Message.NAME, listener, {signal: controller.signal});
+		this.addEventListener(Message.NAME, listener, {signal: controller.signal, ...listenerOptions});
         for (const m of this.query({cid: channel, order: 'DESC', limit: backlog})) {
             if (controller.signal.aborted) {
                 break;
