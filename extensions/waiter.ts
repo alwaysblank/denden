@@ -20,7 +20,8 @@ export const SUCCESS = {
  *
  * The results passed to `callback()` will be an array of tuples where the first item is the route and the second is
  * the payload received. Each route resolves as soon as it receives a message, so `results` will always contain the
- * *first* message sent to any route.
+ * *first* message sent to any route. If you want the *most recent* message from each channel when `callback()` is
+ * called, use {@link latest}.
  *
  * The `results` value passed to `callback()` is ah array of tuples for each route that successfully received a message
  * before the timeout expired. Each tuple has the form `[ routeName, messagePayload ]`. If any routes failed, the
@@ -42,12 +43,14 @@ export const SUCCESS = {
  *      it's very unlikely you would ever need to set a value this high. In most cases, you would probably just want to
  *      use `-1` instead.
  *
+ * @see latest
+ *
  * @param hub - The hub to which we should listen for messages.
  * @param routes - An array of routes to listen to.
  * @param callback - The function to be called when all routes have returned (or the timeout has been reached).
  * @param [waitTime=-1] - Time in milliseconds to wait for messages to be received. A value of `-1` will prevent timeout.
  */
-export function waitFor<T>(hub: Hub, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void, waitTime: number = -1)  {
+export function first<T>(hub: Hub, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void, waitTime: number = -1)  {
     Promise.allSettled(routes.map(route => {
         return new Promise((resolve: (value: [r: ChannelRoute, v: T]) => void, reject) => {
             const unsub = hub.sub<T>(route, (payload) => {
@@ -78,18 +81,18 @@ export function waitFor<T>(hub: Hub, routes: ChannelRoute[], callback: (results:
 /**
  * Wait for all specified routes to receive at least one message, and return a set of the most recent.
  *
- * This function is essentially identical in behavior to {@link waitFor} except that it will return the *last* messages
+ * This function is essentially identical in behavior to {@link first} except that it will return the *last* messages
  * sent to every route, instead of the first. The usual use case here would be if you are listening to more than one
  * route, and expect one (or more) of those routes to send several messages before all have completed.
  *
- * @see waitFor
+ * @see first
  *
  * @param hub - The hub to which we should listen for messages.
  * @param routes - An array of routes to listen to.
  * @param callback - The function to be called when all routes have returned (or the timeout has been reached).
  * @param [waitTime=-1] - Time in milliseconds to wait for messages to be received. A value of `-1` will prevent timeout.
  */
-export function waitForDebounced<T>(hub: Hub, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void, waitTime: number = -1) {
+export function latest<T>(hub: Hub, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void, waitTime: number = -1) {
     const waiter = new Promise((resolve: (results: WaitForResults<T>) => void, reject) => {
        const controller = new AbortController();
        const collector = new Map<ChannelRoute, T>();

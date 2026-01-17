@@ -1,5 +1,5 @@
 import Hub from "../src/hub";
-import {ERRORS, waitFor, waitForDebounced} from "../extensions/waiter";
+import {ERRORS, first, latest} from "../extensions/waiter";
 jest.useFakeTimers();
 
 describe('waitFor', () => {
@@ -7,7 +7,7 @@ describe('waitFor', () => {
         const hub = new Hub();
         const subcb = jest.fn();
         expect.assertions(3);
-        waitFor(hub, ['test', 'sandwich'], (results) => {
+        first(hub, ['test', 'sandwich'], (results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'reuben']);
             done();
@@ -21,7 +21,7 @@ describe('waitFor', () => {
     it('should return early if a function times out', (done) => {
         const hub = new Hub();
         expect.assertions(3);
-        waitFor(hub, ['test', 'sandwich'], (results) => {
+        first(hub, ['test', 'sandwich'], (results) => {
             expect(results).toContainEqual(
                 ['test', 'value']
             );
@@ -38,7 +38,7 @@ describe('waitFor', () => {
         const hub = new Hub();
         const subcb = jest.fn();
         expect.assertions(6);
-        waitFor(hub, ['test', 'sandwich'], (results) => {
+        first(hub, ['test', 'sandwich'], (results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'reuben']);
             done();
@@ -60,7 +60,7 @@ describe('waitForDebounced', () => {
         const hub = new Hub();
         const subcb = jest.fn();
         expect.assertions(6);
-        waitForDebounced(hub, ['test', 'sandwich'], (results) => {
+        latest(hub, ['test', 'sandwich'], (results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'club']);
             done();
@@ -82,7 +82,7 @@ describe('waitForDebounced', () => {
             const hub = new Hub();
             const subcb = jest.fn();
             expect.assertions(7);
-            waitForDebounced(hub, ['test', 'sandwich', 'uncalled'], (results) => {
+            latest(hub, ['test', 'sandwich', 'uncalled'], (results) => {
                 expect(results).toContainEqual(['test', 'value'] );
                 expect(results).toContainEqual(['sandwich', 'club']);
                 expect(results.failed).toContainEqual(['uncalled', ERRORS.TIMED_OUT_SINGLE]);
@@ -104,7 +104,7 @@ describe('waitForDebounced', () => {
             const hub = new Hub();
             const subcb = jest.fn();
             expect.assertions(7);
-            waitForDebounced(hub, ['test', 'sandwich', 'late'], (results) => {
+            latest(hub, ['test', 'sandwich', 'late'], (results) => {
                 expect(results).toContainEqual(['test', 'value'] );
                 expect(results).toContainEqual(['sandwich', 'club']);
                 expect(results.failed).toContainEqual(['late', ERRORS.TIMED_OUT_SINGLE]);
@@ -128,7 +128,7 @@ describe('waitForDebounced', () => {
             const subcb = jest.fn();
             expect.assertions(7);
 
-            waitForDebounced(hub, ['test', 'sandwich'], (results) => {
+            latest(hub, ['test', 'sandwich'], (results) => {
                 expect(results.length).toBe(0);
                 expect(results.failed?.length).toBe(2);
                 expect(results.failed).toStrictEqual([
