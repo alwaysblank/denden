@@ -1,48 +1,60 @@
-import Hub from "../src/hub";
-import {ERRORS, first, latest} from "../extensions/waiter";
+import Hub from "../../src/hub";
+import {ERRORS, first, latest} from "../../extensions/waiter";
 jest.useFakeTimers();
 
-describe('waitFor', () => {
-    it('should return data in the correct form', (done) => {
+describe('first', () => {
+    it('should return data in the correct form', () => {
         const hub = new Hub();
         const subcb = jest.fn();
-        expect.assertions(3);
-        first(hub, ['test', 'sandwich'], (results) => {
+        expect.assertions(5);
+        first(hub, ['test', 'sandwich'], -1, (results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'reuben']);
-            done();
         });
+        first(hub, ['test', 'sandwich']).then((results) => {
+            expect(results).toContainEqual(['test', 'value'] );
+            expect(results).toContainEqual(['sandwich', 'reuben']);
+        })
         hub.sub('*', subcb);
         hub.pub('test', 'value');
         hub.pub('sandwich', 'reuben');
         expect(subcb).toHaveBeenCalledTimes(2);
     });
 
-    it('should return early if a function times out', (done) => {
+    it('should return early if a function times out', () => {
         const hub = new Hub();
-        expect.assertions(3);
-        first(hub, ['test', 'sandwich'], (results) => {
+        expect.assertions(6);
+        first(hub, ['test', 'sandwich'], 10, (results) => {
             expect(results).toContainEqual(
                 ['test', 'value']
             );
             expect(results.length).toBe(1);
-            expect(results.failed).toContainEqual(['sandwich', 'sandwich timed out.']);
-            done();
-        }, 10);
+            expect(results.failed).toContainEqual(['sandwich', ERRORS.TIMED_OUT_SINGLE]);
+        });
+        first(hub, ['test', 'sandwich'], 10).then((results) => {
+            expect(results).toContainEqual(
+                ['test', 'value']
+            );
+            expect(results.length).toBe(1);
+            expect(results.failed).toContainEqual(['sandwich', ERRORS.TIMED_OUT_SINGLE]);
+        })
         hub.pub('test', 'value');
         jest.advanceTimersByTime(50);
         hub.pub('sandwich', 'reuben');
     }, 60);
 
-    it('should return only the first message in a channel', (done) => {
+    it('should return only the first message in a channel', () => {
         const hub = new Hub();
         const subcb = jest.fn();
-        expect.assertions(6);
-        first(hub, ['test', 'sandwich'], (results) => {
+        expect.assertions(8);
+        first(hub, ['test', 'sandwich'], -1, (results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'reuben']);
-            done();
         });
+        first(hub, ['test', 'sandwich']).then((results) => {
+            expect(results).toContainEqual(['test', 'value'] );
+            expect(results).toContainEqual(['sandwich', 'reuben']);
+        })
         hub.sub('*', subcb);
         hub.pub('test', 'value');
         hub.pub('sandwich', 'reuben');
@@ -55,16 +67,19 @@ describe('waitFor', () => {
     });
 });
 
-describe('waitForDebounced', () => {
-    it('should return the most recent result', (done) => {
+describe('latest', () => {
+    it('should return the most recent result', () => {
         const hub = new Hub();
         const subcb = jest.fn();
-        expect.assertions(6);
-        latest(hub, ['test', 'sandwich'], (results) => {
+        expect.assertions(8);
+        latest(hub, ['test', 'sandwich'], -1, (results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'club']);
-            done();
         });
+        latest(hub, ['test', 'sandwich']).then(results => {
+            expect(results).toContainEqual(['test', 'value'] );
+            expect(results).toContainEqual(['sandwich', 'club']);
+        })
         hub.sub('*', subcb);
         hub.pub('sandwich', 'reuben');
         hub.pub('sandwich', 'club');
@@ -78,16 +93,20 @@ describe('waitForDebounced', () => {
 
 
     describe('should reject routes if...', () => {
-        it('a route never fires', (done) => {
+        it('a route never fires', () => {
             const hub = new Hub();
             const subcb = jest.fn();
-            expect.assertions(7);
-            latest(hub, ['test', 'sandwich', 'uncalled'], (results) => {
+            expect.assertions(10);
+            latest(hub, ['test', 'sandwich', 'uncalled'], 0, (results) => {
                 expect(results).toContainEqual(['test', 'value'] );
                 expect(results).toContainEqual(['sandwich', 'club']);
                 expect(results.failed).toContainEqual(['uncalled', ERRORS.TIMED_OUT_SINGLE]);
-                done();
-            }, 0);
+            });
+            latest(hub, ['test', 'sandwich', 'uncalled'], 0).then(results => {
+                expect(results).toContainEqual(['test', 'value'] );
+                expect(results).toContainEqual(['sandwich', 'club']);
+                expect(results.failed).toContainEqual(['uncalled', ERRORS.TIMED_OUT_SINGLE]);
+            })
             hub.sub('*', subcb);
             hub.pub('sandwich', 'reuben');
             hub.pub('sandwich', 'club');
@@ -100,16 +119,20 @@ describe('waitForDebounced', () => {
             expect(subcb).toHaveBeenCalledWith('club', expect.anything(), expect.anything());
         }, 15);
 
-        it('a route fires too late', (done) => {
+        it('a route fires too late', () => {
             const hub = new Hub();
             const subcb = jest.fn();
-            expect.assertions(7);
-            latest(hub, ['test', 'sandwich', 'late'], (results) => {
+            expect.assertions(10);
+            latest(hub, ['test', 'sandwich', 'late'], 0, (results) => {
                 expect(results).toContainEqual(['test', 'value'] );
                 expect(results).toContainEqual(['sandwich', 'club']);
                 expect(results.failed).toContainEqual(['late', ERRORS.TIMED_OUT_SINGLE]);
-                done();
-            }, 0);
+            });
+            latest(hub, ['test', 'sandwich', 'late'], 0).then(results => {
+                expect(results).toContainEqual(['test', 'value'] );
+                expect(results).toContainEqual(['sandwich', 'club']);
+                expect(results.failed).toContainEqual(['late', ERRORS.TIMED_OUT_SINGLE]);
+            })
             hub.sub('*', subcb);
             hub.pub('sandwich', 'reuben');
             hub.pub('sandwich', 'club');
@@ -123,20 +146,27 @@ describe('waitForDebounced', () => {
             expect(subcb).toHaveBeenCalledWith('club', expect.anything(), expect.anything());
         }, 60);
 
-        it('all routes time out', (done) => {
+        it('all routes time out', () => {
             const hub = new Hub();
             const subcb = jest.fn();
-            expect.assertions(7);
+            expect.assertions(10);
 
-            latest(hub, ['test', 'sandwich'], (results) => {
+            latest(hub, ['test', 'sandwich'], 0, (results) => {
                 expect(results.length).toBe(0);
                 expect(results.failed?.length).toBe(2);
                 expect(results.failed).toStrictEqual([
                     ['test', ERRORS.TIMED_OUT_SINGLE],
                     ['sandwich', ERRORS.TIMED_OUT_SINGLE],
                 ]);
-                done();
-            }, 0);
+            });
+            latest(hub, ['test', 'sandwich'], 0).then(results => {
+                expect(results.length).toBe(0);
+                expect(results.failed?.length).toBe(2);
+                expect(results.failed).toStrictEqual([
+                    ['test', ERRORS.TIMED_OUT_SINGLE],
+                    ['sandwich', ERRORS.TIMED_OUT_SINGLE],
+                ]);
+            })
 
             hub.sub('*', subcb);
 
