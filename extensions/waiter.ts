@@ -1,4 +1,5 @@
-import Hub, {ChannelRoute} from "../src/hub";
+import type Hub from "../src/hub";
+import type { ChannelRoute } from "../src/hub";
 
 type WaitForResult<T> = [ChannelRoute, T];
 
