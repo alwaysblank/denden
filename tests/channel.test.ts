@@ -5,6 +5,16 @@ afterEach(() => {
     jest.restoreAllMocks();
 });
 
+describe('Creating channels', () => {
+   it.each([
+       '*',
+       '*wich',
+       'sand*',
+   ])( 'should reject names that contain an asterisk: %s', (name) => {
+       expect(() => new Channel(name)).toThrow();
+   });
+});
+
 describe('Querying Messages', () => {
     it('should respect query() parameters', () => {
         const channel = new Channel('test');

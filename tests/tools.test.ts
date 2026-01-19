@@ -57,6 +57,12 @@ describe('match', () => {
 		[/^s.*d$/, 'should not', 'sandwich'],
 		['*dw*', 'should not', 'sandwich'],
 		['*', 'should', 'sandwich'],
+        [['*'], 'should', 'sandwich'],
+        [[/^s.*d$/, '*wich'], 'should', 'sandwich'],
+        [[/^s.*d$/, 'wich'], 'should not', 'sandwich'],
+        [['sand*', '*wich'], 'should', 'sandwich'],
+        [['sand*', 'sand*'], 'should', 'sandwich'],
+        [['burger', 'sandwich'], 'should', 'sandwich'],
 	])('%p %s match %p', (a, e, b) => {
 		expect(match(a, b)).toBe('should' === e);
 	});

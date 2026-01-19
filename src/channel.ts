@@ -11,7 +11,7 @@ type SendValue = Message|number;
 /**
  * Collect and handle {@link Message}s.
  */
-export default class Channel<Payload extends any> {
+export default class Channel<Payload> {
 	#messages: Message<Payload>[] = [];
 
 	/**
@@ -26,6 +26,9 @@ export default class Channel<Payload extends any> {
 	public readonly name: string;
 
 	constructor(name: string) {
+		if (name.includes('*')) {
+			throw new Error(`Invalid channel '${name}'; Channel names cannot contain '*'.`);
+		}
 		this.name = name;
 	}
 

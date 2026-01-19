@@ -21,6 +21,8 @@ export const sortByProp = <O>(arr: O[], prop: keyof O, order: 'ASC' | 'DESC') =>
         });
 }
 
+export type MatchNeedle = string | RegExp | Array<string|RegExp>;
+
 /**
  * Test if `needle` can be matched against `haystack`.
  *
@@ -35,9 +37,13 @@ export const sortByProp = <O>(arr: O[], prop: keyof O, order: 'ASC' | 'DESC') =>
  * - `*or*` will needle nothing; use a regular expression instead.
  * - Strings without a `*`, or that don't begin or end with `*` will be matched only if they are strictly equal to `haystack`.
  */
-export const match = (needle: RegExp | string, haystack: string) => {
+export const match = (needle: MatchNeedle, haystack: string): boolean => {
     if ('*' === needle) {
         return true;
+    }
+
+    if (Array.isArray(needle)) {
+        return needle.some((n) => match(n, haystack));
     }
 
     if (needle instanceof RegExp) {
