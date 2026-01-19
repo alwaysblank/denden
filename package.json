@@ -7,14 +7,17 @@
   "version": "1.1.0",
   "description": "",
   "scripts": {
-    "build": "rollup --config",
+    "build": "rollup -c",
     "test": "jest"
   },
   "files": [
-    "dist/bundle.js",
+    "dist/browser.js",
+    "dist/denden.js",
     "src/",
     "README.md"
   ],
+  "browser": "dist/browser.js" ,
+  "module": "dist/denden.js",
   "devDependencies": {
     "@babel/core": "^7.26.10",
     "@babel/preset-env": "^7.26.9",
