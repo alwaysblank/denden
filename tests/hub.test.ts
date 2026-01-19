@@ -187,6 +187,50 @@ describe('Subscribing & Publishing', () => {
         expect(callback).toHaveBeenCalledWith('valid message', expect.toHaveChannel('test'), expect.any(Function));
     });
 
+    it('should allow publishing to multiple channels', () => {
+       const hub = new Hub();
+       const cb1 = jest.fn();
+       const cb2 = jest.fn();
+
+       hub.sub('test', cb1);
+       hub.sub('sandwich', cb2);
+
+       hub.pub(['test', 'sandwich'], 'payload');
+
+       expect(cb1).toHaveBeenCalledTimes(1);
+       expect(cb1).toHaveBeenCalledWith('payload', expect.toHaveChannel('test'), expect.any(Function));
+       expect(cb2).toHaveBeenCalledTimes(1);
+       expect(cb2).toHaveBeenCalledWith('payload', expect.toHaveChannel('sandwich'), expect.any(Function));
+    });
+
+    it('should allow publishing multiple payloads to multiple channels', () => {
+        const hub = new Hub();
+        const cb1 = jest.fn();
+        const cb2 = jest.fn();
+
+        hub.sub('test', cb1);
+        hub.sub('sandwich', cb2);
+
+        hub.pub(['test', 'sandwich'], 'one', 'two');
+
+        expect(cb1).toHaveBeenCalledTimes(2);
+        expect(cb1).toHaveBeenCalledWith('one', expect.toHaveChannel('test'), expect.any(Function));
+        expect(cb1).toHaveBeenCalledWith('two', expect.toHaveChannel('test'), expect.any(Function));
+        expect(cb2).toHaveBeenCalledTimes(2);
+        expect(cb2).toHaveBeenCalledWith('one', expect.toHaveChannel('sandwich'), expect.any(Function));
+        expect(cb2).toHaveBeenCalledWith('two', expect.toHaveChannel('sandwich'), expect.any(Function));
+    });
+
+    it('should dispatch multiple pub payloads in the order they were passed', () => {
+        const hub = new Hub();
+        const cb = jest.fn();
+        hub.sub('test', cb);
+
+        hub.pub('test', 'one', 'two', 'three');
+        expect(cb).toHaveBeenNthCalledWith(1, 'one', expect.toHaveChannel('test'), expect.any(Function));
+        expect(cb).toHaveBeenNthCalledWith(2, 'two', expect.toHaveChannel('test'), expect.any(Function));
+        expect(cb).toHaveBeenNthCalledWith(3, 'three', expect.toHaveChannel('test'), expect.any(Function));
+    })
 });
 
 describe('Other message sources', () => {

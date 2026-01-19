@@ -54,15 +54,31 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-	 * Publish a message to a particular channel.
+	 * Publish a message to a particular channel, or channels.
+	 *
+	 * Note that unlike {@link Hub.sub()}, channels passed to this method must be full-qualified (i.e. you can't use
+	 * a regex or *-matching) because channels are dynamically created when publishing if they don't already exist.
 	 */
-	pub<Payload extends any = any>(cid: string, ...payload: Payload[]) {
-		let channel = this.channels.get(cid);
-		if (!(channel instanceof Channel)) {
-			channel = new Channel(cid);
-			this.channels.set(cid, channel);
+	pub<Payload extends any = any>(routes: ChannelRoute|ChannelRoute[], ...payload: Payload[]) {
+		if (!Array.isArray(routes)) {
+			routes = [routes];
 		}
-		channel.send(this, ...payload.map(p => Message.create(channel, p)));
+		const rc = this.getChannelsBy(routes);
+
+		routes
+			.filter((route): route is string => {
+				return 'string' === typeof route && !route.includes('*') && !rc.has(route);
+			})
+			.forEach(name => {
+				this.channels.set(name, new Channel(name));
+				rc.add(name);
+			});
+
+		rc.forEach(name => {
+			const channel = this.channels.get(name) as Channel<Payload>;
+			channel.send(this, ...payload.map(p => Message.create(channel, p)));
+			return;
+		});
 	}
 
 	/**
@@ -123,13 +139,16 @@ export default class Hub extends EventTarget {
 	/**
 	 * Return a Set of channels tracked by this Hub that match `channel`.
 	 */
-	private getChannelsBy(channel: ChannelRoute): Set<string> {
-		if ('*' === channel) {
+	private getChannelsBy(query: ChannelRoute|ChannelRoute[]): Set<string> {
+		if ('*' === query) {
 			return new Set(this.channels.keys());
+		}
+		if (!Array.isArray(query)) {
+			query = [query];
 		}
 		const channels = new Set<string>();
 		this.channels.keys().forEach(c => {
-			if (match(channel, c)) {
+			if (match(query, c)) {
 				channels.add(c);
 			}
 		});
