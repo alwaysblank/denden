@@ -120,16 +120,15 @@ function latest<T>(hub: Hub, routes: ChannelRoute[], waitTime: number = -1, call
            setTimeout(() => {
                controller.abort(ERRORS.TIMED_OUT_SINGLE);
                const results: WaitForResults<T> = [...collector.entries()];
-               if (results.length === routes.length) {
-                   resolve(results);
-               }
-               results.failed = [];
                for (const route of routes) {
                    if (!collector.has(route)) {
+                       if (!Array.isArray(results.failed)) {
+                           results.failed = [];
+                       }
                        results.failed.push([route, ERRORS.TIMED_OUT_SINGLE]);
                    }
                }
-               if(routes.length > results.failed.length) {
+               if(!results.failed || routes.length > results.failed.length) {
                    // At least one route succeeded, so resolve.
                    resolve(results);
                }
@@ -144,18 +143,12 @@ function latest<T>(hub: Hub, routes: ChannelRoute[], waitTime: number = -1, call
                    controller.abort(SUCCESS.ALL_RECEIVED);
                    resolve([...collector.entries()]);
                }
-           }, 1, { signal: controller.signal})
+           }, 1, {signal: controller.signal})
        }
     });
     waiter.then(callback, failure => {
         const result: WaitForResults<T> = [];
-        if (ERRORS.TIMED_OUT_ALL === failure) {
-            result.failed = routes.map(route => {
-                return [route, ERRORS.TIMED_OUT_SINGLE];
-            });
-        } else {
-            result.failed = ['*', failure.toString()];
-        }
+        result.failed= [['*', failure.toString()]];
         callback(result);
     });
 }

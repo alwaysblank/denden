@@ -153,18 +153,16 @@ describe('latest', () => {
 
             latest(hub, ['test', 'sandwich'], 0, (results) => {
                 expect(results.length).toBe(0);
-                expect(results.failed?.length).toBe(2);
+                expect(results.failed?.length).toBe(1);
                 expect(results.failed).toStrictEqual([
-                    ['test', ERRORS.TIMED_OUT_SINGLE],
-                    ['sandwich', ERRORS.TIMED_OUT_SINGLE],
+                    ['*', ERRORS.TIMED_OUT_ALL],
                 ]);
             });
             latest(hub, ['test', 'sandwich'], 0).then(results => {
                 expect(results.length).toBe(0);
-                expect(results.failed?.length).toBe(2);
+                expect(results.failed?.length).toBe(1);
                 expect(results.failed).toStrictEqual([
-                    ['test', ERRORS.TIMED_OUT_SINGLE],
-                    ['sandwich', ERRORS.TIMED_OUT_SINGLE],
+                    ['*', ERRORS.TIMED_OUT_ALL],
                 ]);
             })
 
@@ -182,4 +180,4 @@ describe('latest', () => {
             expect(subcb).toHaveBeenCalledWith('club', expect.anything(), expect.anything());
         }, 15);
     });
-})
+});
