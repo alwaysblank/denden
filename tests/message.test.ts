@@ -7,7 +7,7 @@ describe('Message', () => {
        const message = Message.create(channel, 'message payload');
        expect(message.payload).toEqual('message payload');
        expect(message.channel).toBe(channel); // This should be a reference to the channel, not just something that looks like it.
-       expect(typeof message.timestamp).toEqual('number');
+       expect(typeof message.order).toEqual('number');
    });
 
    it('should return properly formed JSON', () => {

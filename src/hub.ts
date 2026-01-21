@@ -1,10 +1,15 @@
 import Message from './message';
 import Channel, {ChannelQuery} from './channel';
 import {match, sortByProp} from "./tools";
+import {CallbacksFinished} from "./lifecycle";
 
 export type ChannelRoute = string | RegExp;
 
-export type Callback<Payload> = (payload: Payload, message: Message<Payload>, unsub: (reason?: string) => void) => void;
+export type CallbackResult = any|Promise<any>;
+
+export type Callback<Payload> = (payload: Payload, message: Message<Payload>, unsub: (reason?: string) => void) => unknown;
+
+export type WatchProcessor<Payload> = (event: Event) => Payload;
 
 type HubQuery = {
 	cid: ChannelRoute|ChannelRoute[],
@@ -15,19 +20,20 @@ type HubQuery = {
  */
 export default class Hub extends EventTarget {
 	private channels: Map<string, Channel<any>> = new Map();
+	private finished: WeakMap<Message, Array<CallbackResult>> = new WeakMap();
 
 	/**
 	 * Listen to messages sent to a particular channel.
 	 *
 	 * Returns a method which, when called, will terminate the subscription;
 	 * `callback` will not receive any further messages. Optionally, this
-     * `usub` method takes a string argument, indicating why we have
+     * `unsub` method takes a string argument, indicating why we have
      * unsubscribed from this channel. (Currently this is not accessible.)
 	 *
 	 * This method attempts to call `listener` for all historical messages
 	 * in the order in which they were received, but it is theoretically
 	 * possible to construct a circumstance in which messages might be
-	 * received out of order. {@link Message#timestamp} will always be greater
+	 * received out of order. {@link Message#order} will always be greater
 	 * for messages that have been dispatched more recently. However, it is
 	 * a generally good practice for `listener` to be idempotent.
 	 *
@@ -40,7 +46,11 @@ export default class Hub extends EventTarget {
         const controller = new AbortController();
 		const listener = (msg: Event) => {
 			if (msg instanceof Message && match(channel, msg.channel.name)) {
-				callback(msg.payload, msg, (reason?: string) => controller.abort(reason));
+				 const result = callback(msg.payload, msg, (reason?: string) => controller.abort(reason));
+				 this.addToRunning(
+					 msg,
+					 'undefined' === typeof result ? true : result
+				 )
 			}
 		}
 		this.addEventListener(Message.NAME, listener, {signal: controller.signal, ...listenerOptions});
@@ -53,38 +63,94 @@ export default class Hub extends EventTarget {
 		return (reason?: string) => controller.abort(reason);
 	}
 
+	private addToRunning(msg: Message, status: CallbackResult) {
+		let current = this.finished.get(msg)
+		if (!Array.isArray(current)) {
+			current = [];
+		}
+		current.push(status);
+		this.finished.set(msg, current);
+	}
+
 	/**
 	 * Publish a message to a particular channel, or channels.
 	 *
-	 * Note that unlike {@link Hub.sub()}, channels passed to this method must be full-qualified (i.e. you can't use
-	 * a regex or *-matching) because channels are dynamically created when publishing if they don't already exist.
+	 * @param routes Channel route (i.e. a channel name, wildcard string, or {@link RegExp}) to publish to, or an array of the same.
+	 * 		Routes which are not fully-qualified (i.e. they are a wildcard string or a regular expression) will only
+	 * 		dispatch to channels which are already registered on the {@link Hub}. Fully-qualified route names for
+	 * 		unregistered channels will result in the creation of a channel with that name.
+	 * @param {...any} payload One or more items to dispatch to {@link routes}.
 	 */
-	pub<Payload extends any = any>(routes: ChannelRoute|ChannelRoute[], ...payload: Payload[]) {
+	pub<Payload>(routes: ChannelRoute|ChannelRoute[], ...payload: Payload[]) {
 		if (!Array.isArray(routes)) {
 			routes = [routes];
 		}
-		const rc = this.getChannelsBy(routes);
+		const registeredChannels = this.getChannelsBy(routes);
 
+		// For any fully-qualified routes, create channels if they don't already exist.
 		routes
 			.filter((route): route is string => {
-				return 'string' === typeof route && !route.includes('*') && !rc.has(route);
+				return 'string' === typeof route && !route.includes('*') && !registeredChannels.has(route);
 			})
 			.forEach(name => {
-				this.channels.set(name, new Channel(name));
-				rc.add(name);
+				registeredChannels.add(this.channel(name).name);
 			});
 
-		rc.forEach(name => {
-			const channel = this.channels.get(name) as Channel<Payload>;
-			channel.send(this, ...payload.map(p => Message.create(channel, p)));
-			return;
+		registeredChannels.forEach(name => {
+			const channel = this.channel(name);
+			channel.send(this, ...payload.map(p => Message.create(channel, p)))
+				.forEach((i) => {
+					const message = channel.messages[i];
+					if (!message || !this.finished.has(message)) {
+						return;
+					}
+					Promise.allSettled(this.finished.get(message) as Array<CallbackResult>)
+						.then((results) => {
+							this.dispatchEvent(new CallbacksFinished( message,
+								results
+									.map(result => {
+										switch (result.status) {
+											case "fulfilled":
+												return result.value;
+											case "rejected":
+												return new Error(result.reason);
+										}
+									})
+							));
+							this.finished.delete(message);
+						});
+				});
 		});
 	}
 
 	/**
-	 * Watch `target` for an event of `eventType`, and then broadcast it to `channel`.
+	 * Return the channel on this hub called `name`, or create one and return it if none exists.
+	 *
+	 * @param name Channel name.
 	 */
-	watch<Payload extends any = any>(channel: string, target: EventTarget, eventType: string, processor: (e: Event) => Payload) {
+	channel<Payload>(name: string): Channel<Payload> {
+		if (this.channels.has(name)) {
+			return this.channels.get(name) as Channel<Payload>;
+		}
+		const channel = new Channel<Payload>(name);
+		this.channels.set(name, channel);
+
+		return channel;
+	}
+
+	/**
+     * Watch `target` for an event of `eventType`, and then broadcast it to `channel`.
+     *
+     * @param channel The name of the channel to dispatch to. Will be created if it doesn't exit.
+     * @param target {@link EventTarget} to watch for events of {@link eventType}.
+     * @param eventType Type of event to watch for on {@link target}.
+     * @param [processor] Callback to convert events from {@link target} into the appropriate payload for {@link channel}. Defaults to simply returning the entire event object.
+     */
+	watch<Payload extends any = any>(channel: string, target: EventTarget, eventType: string, processor?: WatchProcessor<Payload>) {
+		if ('function' !== typeof processor) {
+			// Default to just passing along the event as-is.
+			processor = (event) => event as Payload;
+		}
 		const listener = (e: Event) => {
 			this.pub<Payload>(channel, processor(e));
 		};
@@ -97,12 +163,12 @@ export default class Hub extends EventTarget {
 	 *
 	 * Messages are returned in reverse chronological order (most recent -> oldest),
 	 *
-	 * @param {Object} query - Set of query options for retrieving messages.
-	 * @param {array} query.cid - A argument (or array of arguments) which can resolve to channel names.
-	 * @param {number} [query.limit=1] - The number of messages to return.
-	 * @param {'ASC'|'DESC'} [query.order='DESC'] - Messages are sorted by order of dispatch: `ASC` is oldest -> newest, `DESC` is newest -> oldest.
+	 * @param query - Set of query options for retrieving messages.
+	 * @param query.cid - A argument (or array of arguments) which can resolve to channel names.
+	 * @param [query.limit=1] - The number of messages to return.
+	 * @param [query.order='DESC'] - Messages are sorted by order of dispatch: `ASC` is oldest -> newest, `DESC` is newest -> oldest.
 	 *
-	 * @return {Message[]} All messages from matching channel(s) which match the `query`. The `Message.channel` property contains a reference to the {@link Channel} that an individual message came from.
+	 * @return All messages from matching channel(s) which match {@link query}. The `Message.channel` property contains a reference to the {@link Channel} that an individual message came from.
 	 */
 	query(query: HubQuery): Message[] {
 		const {
@@ -128,7 +194,7 @@ export default class Hub extends EventTarget {
 			.reduce((collection, channel) => {
 				const msgs = this.channels.get(channel)?.messages;
 				if (msgs) {
-					collection = sortByProp(collection.concat(msgs), 'timestamp', order);
+					collection = sortByProp(collection.concat(msgs), 'order', order);
 				}
 				return collection;
 			}, [] as Message[])

@@ -5,18 +5,16 @@ import Channel from "./channel";
  */
 export default class Message<Payload extends any = any> extends Event {
 	static NAME = 'ddm';
+	static #order: number = 0;
 
 	/**
-	 * A value used to order messages by dispatch time.
-	 *
-	 * This value is *not* a date/time value and should be used only for
-	 * ordering purposes.
+	 * A value used to order messages.
 	 *
 	 * Strictly speaking, it is set on Message creation, not on Message
 	 * dispatch, but when using the methods {@link Hub.pub} or {@link Hub.watch}
 	 * Messages are created at the time of dispatch.
 	 */
-	public readonly timestamp: number;
+	public readonly order: number;
 
 	/**
 	 * The payload being carried by this Message; can be any kind of data.
@@ -33,25 +31,24 @@ export default class Message<Payload extends any = any> extends Event {
 	public readonly channel: Channel<Payload>;
 
 	/**
-	 * To create a message outside of this class, call `Message.create()` which will automatically set `timestamp` to an appropriate value.
+	 * To create a message outside of this class, call `Message.create()` which will automatically set `order` to an appropriate value.
 	 *
 	 * @param channel The channel on which this message is *originally* to be dispatched.
 	 * @param payload Data carried by this message.
-	 * @param timestamp An internal value used to sort messages in their order of creation. *Not* a representation of date-time.
 	 * @private
 	 */
-	private constructor(channel: Channel<Payload>, payload: Payload, timestamp: number) {
+	private constructor(channel: Channel<Payload>, payload: Payload) {
 		super(Message.NAME, {bubbles: false});
-		this.timestamp = timestamp;
+		this.order = Message.#order++;
 		this.channel = channel;
 		this.payload = payload;
 	}
 
 	/**
-	 * Create a new message; this should be used instead of the constructor so that {@link Message#timestamp} is set properly.
+	 * Create a new message; this should be used instead of the constructor so that {@link Message#order} is set properly.
 	 */
 	static create<P>(channel: Channel<P>, payload: P): Message<P> {
-		return new Message(channel, payload, performance.now());
+		return new Message(channel, payload);
 	}
 
 	/**
@@ -61,7 +58,7 @@ export default class Message<Payload extends any = any> extends Event {
 		return {
 			channel: this.channel.name,
 			payload: this.payload,
-			timestamp: this.timestamp,
+			timestamp: this.order,
 		}
 	}
 }

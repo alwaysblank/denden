@@ -3,6 +3,7 @@ import Message from '../src/message';
 import Channel from "../src/channel";
 import {describe, expect} from '@jest/globals';
 import "../definitions/toHaveChannel.d.ts"
+import Lifecycle, {CallbacksFinished} from "../src/lifecycle";
 
 afterEach(() => {
     jest.restoreAllMocks();
@@ -312,4 +313,46 @@ describe('Retrieving messages directly', () => {
         const empty = hub.query({});
         expect(empty).toEqual([]);
     });
-})
+});
+
+describe('Lifecycle', () => {
+   jest.useFakeTimers();
+   describe('SENT', () => {
+       it('runs after all are finished, and has results in call order', () => {
+           expect.assertions(6);
+           const hub = new Hub();
+           const cb1 = jest.fn(() => {
+               return 'one';
+           });
+           const cb2 = jest.fn(() => {
+               return new Promise(resolve => setTimeout(() => resolve('two'), 1000));
+           });
+           const cb3 = jest.fn(() => {
+               return new Promise((_, reject) => setTimeout(() => reject('three'), 1000));
+           });
+           const cb4 = jest.fn(() => {
+               return 'four';
+           });
+           hub.sub('test', cb1);
+           hub.sub('test', cb2);
+           hub.sub('test', cb3);
+           hub.sub('test', cb4);
+           hub.addEventListener(Lifecycle.NAME, (event) => {
+               expect(event).toBeInstanceOf(CallbacksFinished);
+               const {data:{results}} = event as Lifecycle<any>;
+               expect(results).toStrictEqual([
+                   'one',
+                   'two',
+                   expect.objectContaining({message: 'three'}),
+                   'four',
+               ]);
+               expect(cb1).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
+               expect(cb2).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
+               expect(cb3).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
+               expect(cb4).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
+           });
+           hub.pub('test', 'published value');
+           jest.advanceTimersByTime(1000);
+       });
+   })
+});

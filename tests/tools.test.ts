@@ -29,6 +29,22 @@ describe('sortByProp', () => {
        ]);
    });
 
+   it('should sort floats correctly', () => {
+       const arr = [
+           {n: performance.now(), m: 'one'},
+           {n: performance.now(), m: 'two'},
+           {n: performance.now(), m: 'three'},
+           {n: performance.now(), m: 'four'},
+       ];
+
+       const ascending = sortByProp(arr, 'n', 'ASC');
+       const descending = sortByProp(arr, 'n', 'DESC');
+
+       expect(ascending).toStrictEqual(arr);
+       expect(descending).not.toStrictEqual(arr);
+       expect(descending).toStrictEqual(arr.toReversed());
+   });
+
    it('should ignore non-numeric values', () => {
        const arr = [
            {n: 3},
