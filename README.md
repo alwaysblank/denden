@@ -15,3 +15,38 @@ hub.pub('recipes', 'add eggs');
 
 // "add eggs"
 ```
+
+## Installation
+
+If you want to use this as a library in your code, `import {Hub} from "@alwaysblank/denden"` will get you the `Hub` class which is most of what you need:
+
+```js
+const hub = new Hub();
+
+hub.sub('sandwich', payload => console.log(`msg: ${payload}`));
+hub.pub('sandwich', 'reuben');
+
+// "msg: reuben"
+```
+
+If you just want to use it in the browser directly, `dist/browser.js` is an IIFE compiled for the browser.
+It creates a global `window.denden` hub, and looks for a `window._dendenQueue` object from which it will load pre-existing messages.
+This allows you to prepopulate channels with messages before denden itself has loaded:
+
+```js
+window._dendenQueue.push(['sandwich', 'reuben']);
+
+// denden loads
+
+window.denden.sub('sandwich', payload => console.log(`msg: ${payload}`), 1);
+// "msg: reuben"
+
+window.denden.pub('sandwich', 'club');
+// "msg: club"
+```
+
+## Usage
+
+To use denden, you create a **hub** for messages to pass through.
+You can then publish and subscribe to that hub, to send and receive messages.
+A given subscription can listen to multiple **channels**, but a publisher can publish to only a single channel.

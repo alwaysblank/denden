@@ -1,7 +1,20 @@
 import Hub from "./hub";
 
+/**
+ * Record in the queue array.
+ */
 export type QueueRecord<T> = [string, T];
 
+/**
+ * The callback that will be called on rows in a queue.
+ */
+export type QueueCallback<Payload> = (hub: Hub, record: QueueRecord<Payload>) => void;
+
+/**
+ * Determine if {@link record} is a {@link QueueRecord}.
+ *
+ * @param record Record to test.
+ */
 const isQueueRecord = <Payload>(record: unknown): record is QueueRecord<Payload> => {
     if (!Array.isArray(record) || record.length !==2) {
         return false;
@@ -9,8 +22,6 @@ const isQueueRecord = <Payload>(record: unknown): record is QueueRecord<Payload>
     const [channel] = record;
     return 'string' === typeof channel;
 }
-
-export type QueueCallback<Payload> = (hub: Hub, record: QueueRecord<Payload>) => void;
 
 /**
  * Returns a proxy for event `queuedMessages`, and calls `callback()` on each row in `queuedMessages` as well as any time a new row is added to the proxy.

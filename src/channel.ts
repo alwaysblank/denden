@@ -1,11 +1,19 @@
 import Message from './message';
 import {sortByProp} from './tools';
 
+/**
+ * A query against a {@link Channel} to return messages which meet the qualifications of the query.
+ */
 export type ChannelQuery = {
 	order?: 'ASC' | 'DESC';
 	limit?: number;
 }
 
+/**
+ * Represents an argument describing a message to send.
+ * If a {@link Message}, it is the literal message to send.
+ * If a {@link number}, it is the index in the {@link Channel}'s message archive of the message to send.
+ */
 type SendValue = Message|number;
 
 /**
