@@ -1,7 +1,6 @@
 import Message from './message';
 import Channel, {ChannelQuery} from './channel';
 import {match, sortByProp} from "./tools";
-import {CallbacksFinished} from "./lifecycle";
 
 export type ChannelRoute = string | RegExp;
 
@@ -10,6 +9,8 @@ export type CallbackResult = any|Promise<any>;
 export type Callback<Payload> = (payload: Payload, message: Message<Payload>, unsub: (reason?: string) => void) => unknown;
 
 export type WatchProcessor<Payload> = (event: Event) => Payload;
+
+export type PubResult = {payload: unknown, results: Array<unknown>};
 
 type HubQuery = {
 	cid: ChannelRoute|ChannelRoute[],
@@ -20,7 +21,7 @@ type HubQuery = {
  */
 export default class Hub extends EventTarget {
 	private channels: Map<string, Channel<any>> = new Map();
-	private finished: WeakMap<Message, Array<CallbackResult>> = new WeakMap();
+	private running: WeakMap<{payload: unknown}, Array<CallbackResult>> = new WeakMap();
 
 	/**
 	 * Listen to messages sent to a particular channel.
@@ -28,7 +29,7 @@ export default class Hub extends EventTarget {
 	 * Returns a method which, when called, will terminate the subscription;
 	 * `callback` will not receive any further messages. Optionally, this
      * `unsub` method takes a string argument, indicating why we have
-     * unsubscribed from this channel. (Currently this is not accessible.)
+     * unsubscribed from this channel. (Currently, this is not accessible.)
 	 *
 	 * This method attempts to call `listener` for all historical messages
 	 * in the order in which they were received, but it is theoretically
@@ -39,7 +40,7 @@ export default class Hub extends EventTarget {
 	 *
 	 * @param {string} channel Name of the channel to subscribe to. Does not need to exist to be subscribed to. Passing `*` will subscribe to all channels.
 	 * @param {function} callback Called with message payload and channel name when a message is published.
-	 * @param {number} [backlog=0] Number of old messages in channel to send to listener before attaching subscription.
+	 * @param {number} [backlog=0] Number of old messages in the channel(s) to send to listener before attaching subscription.
      * @param {AddEventListenerOptions} [listenerOptions={}] Options passed directly to `addEventListener()`. **Use with caution.**
 	 */
 	sub<Payload extends any = any>(channel: ChannelRoute, callback: Callback<Payload>, backlog: number = 0, listenerOptions: AddEventListenerOptions = {} ) {
@@ -64,62 +65,60 @@ export default class Hub extends EventTarget {
 	}
 
 	private addToRunning(msg: Message, status: CallbackResult) {
-		let current = this.finished.get(msg)
+		let current = this.running.get(msg.contains)
 		if (!Array.isArray(current)) {
 			current = [];
 		}
 		current.push(status);
-		this.finished.set(msg, current);
+		this.running.set(msg.contains, current);
 	}
 
 	/**
 	 * Publish a message to a particular channel, or channels.
 	 *
-	 * @param routes Channel route (i.e. a channel name, wildcard string, or {@link RegExp}) to publish to, or an array of the same.
-	 * 		Routes which are not fully-qualified (i.e. they are a wildcard string or a regular expression) will only
-	 * 		dispatch to channels which are already registered on the {@link Hub}. Fully-qualified route names for
+	 * @param routes Channel route (i.e., a channel name, wildcard string, or {@link RegExp}) to publish to, or an array of the same.
+	 * 		Routes which are not fully-qualified (i.e., they are a wildcard string or a regular expression) will only
+	 * 		dispatch to channels which are already registered on the {@link Hub}. Fully qualified route names for
 	 * 		unregistered channels will result in the creation of a channel with that name.
-	 * @param {...any} payload One or more items to dispatch to {@link routes}.
+	 * @param payload The item to dispatch to {@link routes}.
 	 */
-	pub<Payload>(routes: ChannelRoute|ChannelRoute[], ...payload: Payload[]) {
-		if (!Array.isArray(routes)) {
-			routes = [routes];
-		}
-		const registeredChannels = this.getChannelsBy(routes);
+	pub<Payload>(routes: ChannelRoute|ChannelRoute[], payload: Payload) {
+		return new Promise<Array<PubResult|Error>>((succeeded, failed) => {
+			if (!Array.isArray(routes)) {
+				routes = [routes];
+			}
+			const registeredChannels = this.getChannelsBy(routes);
 
-		// For any fully-qualified routes, create channels if they don't already exist.
-		routes
-			.filter((route): route is string => {
-				return 'string' === typeof route && !route.includes('*') && !registeredChannels.has(route);
-			})
-			.forEach(name => {
-				registeredChannels.add(this.channel(name).name);
+			// For any fully qualified routes, create channels if they don't already exist.
+			routes
+				.filter((route): route is string => {
+					return 'string' === typeof route && !route.includes('*') && !registeredChannels.has(route);
+				})
+				.forEach(name => {
+					registeredChannels.add(this.channel(name).name);
+				});
+
+			const contains = {payload};
+			registeredChannels.forEach(name => {
+				const channel = this.channel<Payload>(name);
+				channel.send(this, new Message<Payload>(channel, contains));
 			});
 
-		registeredChannels.forEach(name => {
-			const channel = this.channel(name);
-			channel.send(this, ...payload.map(p => Message.create(channel, p)))
-				.forEach((i) => {
-					const message = channel.messages[i];
-					if (!message || !this.finished.has(message)) {
-						return;
+			const running = this.running.get(contains);
+			if (!Array.isArray(running)) {
+				return succeeded([]);
+			}
+
+			Promise.allSettled(running).then(completed => {
+				return completed.map(result => {
+					switch (result.status) {
+						case "fulfilled":
+							return result.value;
+						case 'rejected':
+							return new Error(result.reason);
 					}
-					Promise.allSettled(this.finished.get(message) as Array<CallbackResult>)
-						.then((results) => {
-							this.dispatchEvent(new CallbacksFinished( message,
-								results
-									.map(result => {
-										switch (result.status) {
-											case "fulfilled":
-												return result.value;
-											case "rejected":
-												return new Error(result.reason);
-										}
-									})
-							));
-							this.finished.delete(message);
-						});
-				});
+				})
+			}).then(succeeded, failed);
 		});
 	}
 

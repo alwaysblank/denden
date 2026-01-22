@@ -45,8 +45,35 @@ window.denden.pub('sandwich', 'club');
 // "msg: club"
 ```
 
-## Usage
+## Examples
 
-To use denden, you create a **hub** for messages to pass through.
-You can then publish and subscribe to that hub, to send and receive messages.
-A given subscription can listen to multiple **channels**, but a publisher can publish to only a single channel.
+**Allow hooking into behavior via `sub()`**
+
+```ts
+const hub = new Hub();
+
+hub.sub<number>('allow-action', (payload) => {
+  return payload > 1;
+});
+
+hub.sub<number>('allow-action', (payload) => {
+  return payload < 10;
+});
+
+hub.sub<number>('allow-action', (payload) => {
+  return payload > 5;
+});
+
+async function maybeDoAThing(num: number) {
+    const results = await hub.pub('allow-action', num);
+    if (!results.some(r => r === false)) {
+      doThing();
+    }
+}
+
+maybeDoAThing(8);
+// doThing() will execute
+
+maybeDoAThing(11);
+// doThing() will not execute
+```
