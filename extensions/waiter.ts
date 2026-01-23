@@ -17,10 +17,10 @@ const SUCCESS = {
 }
 
 /**
- * Wait for the first message(s) sent to the specified routes, within the specified timeout.
+ * Wait for the first message(s) sent to the specified {@link routes}, within the specified timeout.
  *
- * If passed a `callback`, it will invoke that callback when all messages have been captured or
- * `waitTime` is exceeded. Otherwise, it will return a Promise which resolves to the same result.
+ * If passed a {@link callback}, it will invoke that callback when all messages have been captured or
+ * {@link waitTime} is exceeded. Otherwise, it will return a Promise which resolves to the same result.
  * In either case, the ultimate results will be an array containing tuples of the form `[routeName, payload]`
  * for every route which successfully produces a message. If any routes timed out or otherwise failed,
  * the `results` object will have a `failed` property, containing an array of tuples in the form
@@ -29,7 +29,7 @@ const SUCCESS = {
  * This function captures the first messages it recieves on each route. If you want the latest (or last) messages
  * for each route, use {@link latest}.
  *
- * `waitTime` is passed to `setTimeout()` as the {@link https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout#delay delay}, which means it is bound by the limitations inherent
+ * {@link waitTime} is passed to `setTimeout()` as the {@link https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout#delay delay}, which means it is bound by the limitations inherent
  * in that mechanism. There are a few values that will trigger special behavior:
  *
  * - `-1` - This is the default value. This value prevents the listener from every timing out: It will wait
@@ -46,18 +46,18 @@ const SUCCESS = {
  * @see latest
  *
  * @param hub The {@link Hub} instance to which this will subscribe.
+ * @param waitTime Time in milliseconds to wait for a message before timing out.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- * @param [waitTime=-1] Time in milliseconds to wait for a message before timing out.
  * @param [callback] If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
  *
  * @return Promise if `callback` is passed; void otherwise.
  */
-function first<T>(hub: Hub, routes: ChannelRoute[], waitTime?: number): Promise<WaitForResults<T>>;
-function first<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, callback: (results: WaitForResults<T>) => void): void;
-function first<T>(hub: Hub, routes: ChannelRoute[], waitTime: number = -1, callback?: (results: WaitForResults<T>) => void ): Promise<WaitForResults<T>>|void {
+function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
+function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
+function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?: (results: WaitForResults<T>) => void): Promise<WaitForResults<T>> | void {
     if (!callback) {
         return new Promise(resolve => {
-           first<T>(hub, routes, waitTime, (results) => resolve(results));
+           first<T>(hub, waitTime, routes, (results) => resolve(results));
         });
     }
 
@@ -91,7 +91,7 @@ function first<T>(hub: Hub, routes: ChannelRoute[], waitTime: number = -1, callb
 }
 
 /**
- * Wait for all specified routes to receive at least one message, and return a set of the most recent.
+ * Wait for all specified {@link routes} to receive at least one message, and return a set of the most recent.
  *
  * This function is essentially identical in behavior to {@link first} except that it will return the *last* messages
  * sent to every route, instead of the first. The usual use case here would be if you are listening to more than one
@@ -100,18 +100,18 @@ function first<T>(hub: Hub, routes: ChannelRoute[], waitTime: number = -1, callb
  * @see first
  *
  * @param hub The {@link Hub} instance to which this will subscribe.
+ * @param waitTime Time in milliseconds to wait for a message before timing out.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- * @param [waitTime=-1] Time in milliseconds to wait for a message before timing out.
  * @param [callback] If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
  *
  * @return Promise if `callback` is passed; void otherwise.
  */
-function latest<T>(hub: Hub, routes: ChannelRoute[], waitTime?: number): Promise<WaitForResults<T>>;
-function latest<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, callback: (results: WaitForResults<T>) => void): void;
-function latest<T>(hub: Hub, routes: ChannelRoute[], waitTime: number = -1, callback?: (results: WaitForResults<T>) => void ): Promise<WaitForResults<T>>|void {
+function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
+function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
+function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?: (results: WaitForResults<T>) => void): Promise<WaitForResults<T>> | void {
     if (!callback) {
         return new Promise(resolve => {
-            latest<T>(hub, routes, waitTime, (results) => resolve(results));
+            latest<T>(hub, waitTime, routes, (results) => resolve(results));
         });
     }
     const waiter = new Promise((resolve: (results: WaitForResults<T>) => void, reject) => {

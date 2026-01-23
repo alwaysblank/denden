@@ -7,11 +7,11 @@ describe('first', () => {
         const hub = new Hub();
         const subcb = jest.fn();
         expect.assertions(5);
-        first(hub, ['test', 'sandwich'], -1, (results) => {
-            expect(results).toContainEqual(['test', 'value'] );
-            expect(results).toContainEqual(['sandwich', 'reuben']);
-        });
-        first(hub, ['test', 'sandwich']).then((results) => {
+        first(hub, -1, ['test', 'sandwich'], (results) => {
+			expect(results).toContainEqual(['test', 'value']);
+			expect(results).toContainEqual(['sandwich', 'reuben']);
+		});
+        first(hub, undefined, ['test', 'sandwich']).then((results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'reuben']);
         })
@@ -24,14 +24,14 @@ describe('first', () => {
     it('should return early if a function times out', () => {
         const hub = new Hub();
         expect.assertions(6);
-        first(hub, ['test', 'sandwich'], 10, (results) => {
-            expect(results).toContainEqual(
-                ['test', 'value']
-            );
-            expect(results.length).toBe(1);
-            expect(results.failed).toContainEqual(['sandwich', ERRORS.TIMED_OUT_SINGLE]);
-        });
-        first(hub, ['test', 'sandwich'], 10).then((results) => {
+        first(hub, 10, ['test', 'sandwich'], (results) => {
+			expect(results).toContainEqual(
+				['test', 'value']
+			);
+			expect(results.length).toBe(1);
+			expect(results.failed).toContainEqual(['sandwich', ERRORS.TIMED_OUT_SINGLE]);
+		});
+        first(hub, 10, ['test', 'sandwich']).then((results) => {
             expect(results).toContainEqual(
                 ['test', 'value']
             );
@@ -47,11 +47,11 @@ describe('first', () => {
         const hub = new Hub();
         const subcb = jest.fn();
         expect.assertions(8);
-        first(hub, ['test', 'sandwich'], -1, (results) => {
-            expect(results).toContainEqual(['test', 'value'] );
-            expect(results).toContainEqual(['sandwich', 'reuben']);
-        });
-        first(hub, ['test', 'sandwich']).then((results) => {
+        first(hub, -1, ['test', 'sandwich'], (results) => {
+			expect(results).toContainEqual(['test', 'value']);
+			expect(results).toContainEqual(['sandwich', 'reuben']);
+		});
+        first(hub, undefined, ['test', 'sandwich']).then((results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'reuben']);
         })
@@ -72,11 +72,11 @@ describe('latest', () => {
         const hub = new Hub();
         const subcb = jest.fn();
         expect.assertions(8);
-        latest(hub, ['test', 'sandwich'], -1, (results) => {
-            expect(results).toContainEqual(['test', 'value'] );
-            expect(results).toContainEqual(['sandwich', 'club']);
-        });
-        latest(hub, ['test', 'sandwich']).then(results => {
+        latest(hub, -1, ['test', 'sandwich'], (results) => {
+			expect(results).toContainEqual(['test', 'value']);
+			expect(results).toContainEqual(['sandwich', 'club']);
+		});
+        latest(hub, undefined, ['test', 'sandwich']).then(results => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'club']);
         })
@@ -97,12 +97,12 @@ describe('latest', () => {
             const hub = new Hub();
             const subcb = jest.fn();
             expect.assertions(10);
-            latest(hub, ['test', 'sandwich', 'uncalled'], 0, (results) => {
-                expect(results).toContainEqual(['test', 'value'] );
-                expect(results).toContainEqual(['sandwich', 'club']);
-                expect(results.failed).toContainEqual(['uncalled', ERRORS.TIMED_OUT_SINGLE]);
-            });
-            latest(hub, ['test', 'sandwich', 'uncalled'], 0).then(results => {
+            latest(hub, 0, ['test', 'sandwich', 'uncalled'], (results) => {
+				expect(results).toContainEqual(['test', 'value']);
+				expect(results).toContainEqual(['sandwich', 'club']);
+				expect(results.failed).toContainEqual(['uncalled', ERRORS.TIMED_OUT_SINGLE]);
+			});
+            latest(hub, 0, ['test', 'sandwich', 'uncalled']).then(results => {
                 expect(results).toContainEqual(['test', 'value'] );
                 expect(results).toContainEqual(['sandwich', 'club']);
                 expect(results.failed).toContainEqual(['uncalled', ERRORS.TIMED_OUT_SINGLE]);
@@ -123,12 +123,12 @@ describe('latest', () => {
             const hub = new Hub();
             const subcb = jest.fn();
             expect.assertions(10);
-            latest(hub, ['test', 'sandwich', 'late'], 0, (results) => {
-                expect(results).toContainEqual(['test', 'value'] );
-                expect(results).toContainEqual(['sandwich', 'club']);
-                expect(results.failed).toContainEqual(['late', ERRORS.TIMED_OUT_SINGLE]);
-            });
-            latest(hub, ['test', 'sandwich', 'late'], 0).then(results => {
+            latest(hub, 0, ['test', 'sandwich', 'late'], (results) => {
+				expect(results).toContainEqual(['test', 'value']);
+				expect(results).toContainEqual(['sandwich', 'club']);
+				expect(results.failed).toContainEqual(['late', ERRORS.TIMED_OUT_SINGLE]);
+			});
+            latest(hub, 0, ['test', 'sandwich', 'late']).then(results => {
                 expect(results).toContainEqual(['test', 'value'] );
                 expect(results).toContainEqual(['sandwich', 'club']);
                 expect(results.failed).toContainEqual(['late', ERRORS.TIMED_OUT_SINGLE]);
@@ -151,14 +151,14 @@ describe('latest', () => {
             const subcb = jest.fn();
             expect.assertions(10);
 
-            latest(hub, ['test', 'sandwich'], 0, (results) => {
-                expect(results.length).toBe(0);
-                expect(results.failed?.length).toBe(1);
-                expect(results.failed).toStrictEqual([
-                    ['*', ERRORS.TIMED_OUT_ALL],
-                ]);
-            });
-            latest(hub, ['test', 'sandwich'], 0).then(results => {
+            latest(hub, 0, ['test', 'sandwich'], (results) => {
+				expect(results.length).toBe(0);
+				expect(results.failed?.length).toBe(1);
+				expect(results.failed).toStrictEqual([
+					['*', ERRORS.TIMED_OUT_ALL],
+				]);
+			});
+            latest(hub, 0, ['test', 'sandwich']).then(results => {
                 expect(results.length).toBe(0);
                 expect(results.failed?.length).toBe(1);
                 expect(results.failed).toStrictEqual([
