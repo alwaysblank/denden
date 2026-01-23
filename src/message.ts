@@ -1,5 +1,3 @@
-import Channel from "./channel";
-
 /**
  * An Event carrying some kind of data.
  */
@@ -32,10 +30,10 @@ export default class Message<Payload extends any = any> extends Event {
 	 * The {@link Channel} on which this Message was originally dispatched.
 	 *
 	 * This can be relevant because in some situations (i.e. when calling
-	 * {@link Hub.query} or {@link Hub.sub}) Messages can be returned from
+	 * {@link Hub.getMessages} or {@link Hub.sub}) Messages can be returned from
 	 * across several channels.
 	 */
-	public readonly channel: Channel<Payload>;
+	public readonly channel: string;
 
 	/**
 	 * If manually creating a message outside of a Hub, using {@link Message.create} is easier to use.
@@ -47,7 +45,7 @@ export default class Message<Payload extends any = any> extends Event {
 	 * @param channel The {@link Channel} on which this message is *originally* to be dispatched.
 	 * @param payload Object containing the payload.
 	 */
-	constructor(channel: Channel<Payload>, payload: {payload: Payload}) {
+	constructor(channel: string, payload: {payload: Payload}) {
 		super(Message.NAME, {bubbles: false});
 		this.order = Message.#order++;
 		this.channel = channel;
@@ -67,7 +65,7 @@ export default class Message<Payload extends any = any> extends Event {
 	 * @param channel The {@link Channel} on which this message is *originally* to be dispatched.
 	 * @param payload The data being carried by this message.
 	 */
-	static create<Payload extends any>(channel: Channel<Payload>, payload: Payload): Message<Payload> {
+	static create<Payload extends any>(channel: string, payload: Payload): Message<Payload> {
 		return new Message(channel, {payload});
 	}
 
@@ -76,9 +74,9 @@ export default class Message<Payload extends any = any> extends Event {
 	 */
 	toJSON() {
 		return {
-			channel: this.channel.name,
+			channel: this.channel,
 			payload: this.payload,
-			timestamp: this.order,
+			order: this.order,
 		}
 	}
 }

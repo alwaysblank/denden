@@ -1,8 +1,9 @@
 import Message from './message';
-import Channel, {ChannelQuery} from './channel';
 import {match, sortByProp} from "./tools";
 
 export type ChannelRoute = string | RegExp;
+
+export type Channel = Array<Message> & {name: string};
 
 export type CallbackResult = any|Promise<any>;
 
@@ -12,15 +13,17 @@ export type WatchProcessor<Payload> = (event: Event) => Payload;
 
 export type PubResult = {payload: unknown, results: Array<unknown>};
 
-type HubQuery = {
+type MessageQuery = {
 	cid: ChannelRoute|ChannelRoute[],
-} & ChannelQuery;
+	order?: 'ASC' | 'DESC';
+	limit?: number;
+};
 
 /**
  * Hub for sending and registering to receive messages.
  */
 export default class Hub extends EventTarget {
-	private channels: Map<string, Channel<any>> = new Map();
+	private channels: Map<string, Channel> = new Map();
 	private running: WeakMap<{payload: unknown}, Array<CallbackResult>> = new WeakMap();
 
 	/**
@@ -46,7 +49,7 @@ export default class Hub extends EventTarget {
 	sub<Payload extends any = any>(channel: ChannelRoute, callback: Callback<Payload>, backlog: number = 0, listenerOptions: AddEventListenerOptions = {} ) {
         const controller = new AbortController();
 		const listener = (msg: Event) => {
-			if (msg instanceof Message && match(channel, msg.channel.name)) {
+			if (msg instanceof Message && match(channel, msg.channel)) {
 				 const result = callback(msg.payload, msg, (reason?: string) => controller.abort(reason));
 				 this.addToRunning(
 					 msg,
@@ -64,15 +67,6 @@ export default class Hub extends EventTarget {
 		return (reason?: string) => controller.abort(reason);
 	}
 
-	private addToRunning(msg: Message, status: CallbackResult) {
-		let current = this.running.get(msg.contains)
-		if (!Array.isArray(current)) {
-			current = [];
-		}
-		current.push(status);
-		this.running.set(msg.contains, current);
-	}
-
 	/**
 	 * Publish a message to a particular channel, or channels.
 	 *
@@ -87,25 +81,25 @@ export default class Hub extends EventTarget {
 			if (!Array.isArray(routes)) {
 				routes = [routes];
 			}
-			const registeredChannels = this.getChannelsBy(routes);
+			const fullyQualifiedChannels = this.getChannels(routes);
 
 			// For any fully qualified routes, create channels if they don't already exist.
-			routes
-				.filter((route): route is string => {
-					return 'string' === typeof route && !route.includes('*') && !registeredChannels.has(route);
-				})
-				.forEach(name => {
-					registeredChannels.add(this.channel(name).name);
-				});
+			for (const route of routes) {
+				if('string' === typeof route && !route.includes('*') && !fullyQualifiedChannels.has(route)) {
+					fullyQualifiedChannels.add(this.channel(route).name);
+				}
+			}
 
 			const contains = {payload};
-			registeredChannels.forEach(name => {
-				const channel = this.channel<Payload>(name);
-				channel.send(this, new Message<Payload>(channel, contains));
+			fullyQualifiedChannels.forEach(name => {
+				this.channel<Payload>(name)
+					.push(new Message<Payload>(name, contains));
+				return;
 			});
 
-			const running = this.running.get(contains);
-			if (!Array.isArray(running)) {
+			const running = this.running.get(contains) ?? [];
+			if (running.length === 0) {
+				// This is a valid case; it means we dispatched a message that nothing is subscribed to.
 				return succeeded([]);
 			}
 
@@ -120,21 +114,6 @@ export default class Hub extends EventTarget {
 				})
 			}).then(succeeded, failed);
 		});
-	}
-
-	/**
-	 * Return the channel on this hub called `name`, or create one and return it if none exists.
-	 *
-	 * @param name Channel name.
-	 */
-	channel<Payload>(name: string): Channel<Payload> {
-		if (this.channels.has(name)) {
-			return this.channels.get(name) as Channel<Payload>;
-		}
-		const channel = new Channel<Payload>(name);
-		this.channels.set(name, channel);
-
-		return channel;
 	}
 
 	/**
@@ -202,9 +181,9 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-	 * Return a Set of channels tracked by this Hub that match `channel`.
+	 * Return a Set of channels tracked by this Hub that match {@link query}.
 	 */
-	private getChannelsBy(query: ChannelRoute|ChannelRoute[]): Set<string> {
+	getChannels(query: ChannelRoute|ChannelRoute[]): Set<string> {
 		if ('*' === query) {
 			return new Set(this.channels.keys());
 		}
@@ -218,5 +197,61 @@ export default class Hub extends EventTarget {
 			}
 		});
 		return channels;
+	}
+
+	/**
+	 * Create a channel named {@link name}.
+	 *
+	 * If such a channel already exists, this method will return the name of the existing channel.
+	 */
+	makeChannel(name: string) {
+		return this.channel(name).name;
+	}
+
+	/**
+	 * Return the channel on this hub called {@link name}, or create one and return it if none exists.
+	 */
+	private channel<Payload>(name: string) {
+		const existing = this.channels.get(name);
+		if (existing) {
+			return existing;
+		}
+		const self = this;
+		const messages: Message<Payload>[] = [];
+		const channel = new Proxy(messages, {
+			set(channel, index, message) {
+				if ('string' === typeof index && Number.isInteger(parseInt(index))) {
+					if (!(message instanceof Message)) {
+						throw new Error('Channels can only contain Messages.', message);
+					}
+					self.dispatchEvent(message);
+				}
+				return Reflect.set(channel, index, message);
+			},
+			get(channel, property) {
+				if ('name' === property) {
+					return name;
+				}
+				return Reflect.get(channel, property);
+			},
+		}) as Channel;
+		this.channels.set(name, channel);
+
+		return channel;
+	}
+
+	/**
+	 * Add a {@link status callback result} to the list of results for a given {@link msg message}.
+	 *
+	 * @param msg The message this callback is processing.
+	 * @param status Value returned by the callback; may be a Promise.
+	 */
+	private addToRunning(msg: Message, status: CallbackResult) {
+		let current = this.running.get(msg.contains)
+		if (!Array.isArray(current)) {
+			current = [];
+		}
+		current.push(status);
+		this.running.set(msg.contains, current);
 	}
 }

@@ -1,7 +1,7 @@
 import {expect} from "@jest/globals";
 
-export const toHaveChannel = (actual: Partial<{channel: {name: string}}>, channel: string) => {
-    const actualChannel = actual?.channel?.name;
+export const toHaveChannel = (actual: Partial<{channel: string}>, channel: string) => {
+    const actualChannel = actual?.channel;
     const errMsg = () => {
         return `expected ${channel}, got ${actualChannel || 'no channel found'}`;
     }
