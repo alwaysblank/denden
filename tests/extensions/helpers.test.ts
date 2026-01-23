@@ -35,7 +35,7 @@ describe('once', () => {
 
         hub.pub('test', 'past');
 
-        expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(1);
+        expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(1);
         expect(doOnce).toHaveBeenCalledTimes(0);
         expect(onceFuture).toHaveBeenCalledTimes(0);
         expect(every).toHaveBeenCalledTimes(0);

@@ -1,6 +1,5 @@
 import Hub from '../src/hub';
 import Message from '../src/message';
-import Channel from "../src/channel";
 import {describe, expect} from '@jest/globals';
 import "../definitions/toHaveChannel.d.ts"
 
@@ -36,7 +35,7 @@ describe('Subscribing & Publishing', () => {
         expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
         expect(callback).toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
         expect(callback).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
-        expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(3);
+        expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(3);
     });
 
     it('should allow one subscriber to specify multiple channels', () => {
@@ -73,7 +72,7 @@ describe('Subscribing & Publishing', () => {
         hub.pub('test', 'hamburger');
         hub.pub('test', 'salad');
         hub.pub('test', 'ice cream');
-        expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(4);
+        expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(4);
         const callback2items = jest.fn();
         const callbackAllItems = jest.fn();
 
@@ -108,24 +107,24 @@ describe('Subscribing & Publishing', () => {
         hub.pub('test', 'sandwich');
         expect(callback).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
-        expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(1)
+        expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(1)
         unsub();
         hub.pub('test', 'hamburger');
         expect(callback).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
         expect(callback).not.toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
-        expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(2);
+        expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(2);
 
         const inner = jest.fn();
         hub.sub('test', (payload, channel, unsub) => {
-            inner(payload);
+            inner(payload, channel);
             unsub();
         });
         hub.pub('test', 'salad');
         hub.pub('test', 'ice cream');
         expect(inner).toHaveBeenCalledTimes(1);
-        expect(inner).toHaveBeenCalledWith('salad');
-        expect(inner).not.toHaveBeenCalledWith('ice cream');
+        expect(inner).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'));
+        expect(inner).not.toHaveBeenCalledWith('ice cream', expect.toHaveChannel('test'));
     });
 
     it('should allow unsubscribing while parsing previous message', () => {
@@ -173,12 +172,10 @@ describe('Subscribing & Publishing', () => {
         expect(callback).toHaveBeenCalledTimes(0);
 
         // We have to do this because Hub doesn't expose a way to insert a channel by itself--it doesn't need to.
-        // @ts-expect-error
-        hub.channels.set('test', new Channel('test'));
+		hub.channel('test');
 
         // We have to do this because Hub doesn't give us public access to the channels it tracks--we shouldn't need that normally, and we don't want people messing with them.
-        // @ts-expect-error
-        const msg = Message.create(hub.channels.get('test'), 'valid message');
+        const msg = Message.create(hub.channel('test').name, 'valid message');
 
         // We finally send a valid message!
         hub.dispatchEvent(msg);
@@ -279,11 +276,11 @@ describe('Other message sources', () => {
         emitter.dispatchEvent(new Event('test'));
         expect(callback).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledWith('test', expect.toHaveChannel('emitter'), expect.any(Function));
-        expect(hub.query({cid:'emitter', limit: Infinity})).toHaveLength(1);
+        expect(hub.getMessages({cid:'emitter', limit: Infinity})).toHaveLength(1);
         unwatch();
         emitter.dispatchEvent(new Event('test'));
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(hub.query({cid:'emitter', limit: Infinity})).toHaveLength(1);
+        expect(hub.getMessages({cid:'emitter', limit: Infinity})).toHaveLength(1);
     });
 });
 
@@ -293,13 +290,13 @@ describe('Retrieving messages directly', () => {
         hub.pub('test', 'sandwich');
         hub.pub('test', 'hamburger');
         hub.pub('test', 'salad');
-        expect(hub.query({cid:'test', limit: Infinity})).toHaveLength(3); // Default is to return all.
-        expect(hub.query({cid: 'test', limit: 1})).toHaveLength(1);
-        expect(hub.query({cid: 'test', limit: 1, order: 'ASC'})).toHaveLength(1);
-        expect(hub.query({cid: 'test', limit: 2})).toHaveLength(2);
-        expect(hub.query({cid: 'test', limit: 1})[0].payload).toBe('salad'); // Should return last item.
-        expect(hub.query({cid: 'test', limit: 1, order: 'ASC'})[0].payload).toBe('sandwich'); // Should return first item.
-        expect(hub.query({cid: 'does not exist', limit: 10})).toStrictEqual([]);
+        expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(3); // Default is to return all.
+        expect(hub.getMessages({cid: 'test', limit: 1})).toHaveLength(1);
+        expect(hub.getMessages({cid: 'test', limit: 1, order: 'ASC'})).toHaveLength(1);
+        expect(hub.getMessages({cid: 'test', limit: 2})).toHaveLength(2);
+        expect(hub.getMessages({cid: 'test', limit: 1})[0].payload).toBe('salad'); // Should return last item.
+        expect(hub.getMessages({cid: 'test', limit: 1, order: 'ASC'})[0].payload).toBe('sandwich'); // Should return first item.
+        expect(hub.getMessages({cid: 'does not exist', limit: 10})).toStrictEqual([]);
     });
 
     it('should allow queries to get messages from multiple channels', () => {
@@ -310,7 +307,7 @@ describe('Retrieving messages directly', () => {
         hub.pub('test/3', 'test three');
         hub.pub('sandwich/reuben', ['russian dressing', 'pastrami']);
 
-        const all = hub.query({cid:'*', limit: Infinity});
+        const all = hub.getMessages({cid:'*', limit: Infinity});
         expect(all).toHaveLength(4);
         expect(all.map(m => m.payload)).toStrictEqual([
             ['russian dressing', 'pastrami'],
@@ -319,7 +316,7 @@ describe('Retrieving messages directly', () => {
             'test one',
         ]);
 
-        const allReverse = hub.query({cid: '*', limit: Infinity, order: 'ASC'});
+        const allReverse = hub.getMessages({cid: '*', limit: Infinity, order: 'ASC'});
         expect(allReverse).toHaveLength(4);
         expect(allReverse.map(m => m.payload)).toStrictEqual([
             'test one',
@@ -328,7 +325,7 @@ describe('Retrieving messages directly', () => {
             ['russian dressing', 'pastrami'],
         ]);
 
-        const regex = hub.query( {cid: /test\/2|sandwich\/\w+/, limit: Infinity});
+        const regex = hub.getMessages( {cid: /test\/2|sandwich\/\w+/, limit: Infinity});
         expect(regex).toHaveLength(2);
         expect(regex.map(m => m.payload)).toStrictEqual([
             ['russian dressing', 'pastrami'],
@@ -345,7 +342,7 @@ describe('Retrieving messages directly', () => {
 
         // We want to test a state that TypeScript would like to prevent--but it can't prevent at runtime.
         // @ts-expect-error
-        const empty = hub.query({});
+        const empty = hub.getMessages({});
         expect(empty).toEqual([]);
     });
 });

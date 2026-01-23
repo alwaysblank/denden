@@ -58,7 +58,7 @@ export default class Hub extends EventTarget {
 			}
 		}
 		this.addEventListener(Message.NAME, listener, {signal: controller.signal, ...listenerOptions});
-        for (const m of this.query({cid: channel, order: 'DESC', limit: backlog})) {
+        for (const m of this.getMessages({cid: channel, order: 'DESC', limit: backlog})) {
             if (controller.signal.aborted) {
                 break;
             }
@@ -146,9 +146,9 @@ export default class Hub extends EventTarget {
 	 * @param [query.limit=1] - The number of messages to return.
 	 * @param [query.order='DESC'] - Messages are sorted by order of dispatch: `ASC` is oldest -> newest, `DESC` is newest -> oldest.
 	 *
-	 * @return All messages from matching channel(s) which match {@link query}. The `Message.channel` property contains a reference to the {@link Channel} that an individual message came from.
+	 * @return All messages from matching channel(s) which match {@link getMessages}. The `Message.channel` property contains a reference to the {@link Channel} that an individual message came from.
 	 */
-	query(query: HubQuery): Message[] {
+	getMessages(query: MessageQuery): Message[] {
 		const {
 			cid,
 			limit = 1,
@@ -167,10 +167,10 @@ export default class Hub extends EventTarget {
 		const routes = Array.isArray(cid) ? cid : [cid];
 
 		const messages = Array.from(routes.reduce((collection, route) => {
-			return collection.union(this.getChannelsBy(route));
+			return collection.union(this.getChannels(route));
 		}, new Set<string>()))
 			.reduce((collection, channel) => {
-				const msgs = this.channels.get(channel)?.messages;
+				const msgs = this.channels.get(channel);
 				if (msgs) {
 					collection = sortByProp(collection.concat(msgs), 'order', order);
 				}
