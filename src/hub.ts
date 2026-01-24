@@ -71,7 +71,7 @@ export default class Hub extends EventTarget {
 	 * This method attempts to call `listener` for all historical messages
 	 * in the order in which they were received, but it is theoretically
 	 * possible to construct a circumstance in which messages might be
-	 * received out of order. {@link Message.order} will always be greater
+	 * received out of order. {@link message!default.order Message.order} will always be greater
 	 * for messages that have been dispatched more recently. However, it is
 	 * a generally good practice for `listener` to be idempotent.
 	 *
@@ -105,7 +105,7 @@ export default class Hub extends EventTarget {
 	 *
 	 * Callbacks which returned `void` or `undefined` will have the value `true`.
 	 *
-	 * @param routes Channel route (i.e., a channel name, wildcard string, or {@link RegExp}) to publish to, or an array of the same.
+	 * @param routes Channel route (i.e., a channel name, wildcard string, or RegExp) to publish to, or an array of the same.
 	 * 		Routes which are not fully-qualified (i.e., they are a wildcard string or a regular expression) will only
 	 * 		dispatch to channels which are already registered on the {@link Hub}. Fully qualified route names for
 	 * 		unregistered channels will result in the creation of a channel with that name.
@@ -156,10 +156,10 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-     * Watch `target` for an event of `eventType`, and then broadcast it to `channel`.
+     * Watch an event emitter and retransmit events to a channel.
      *
      * @param channel The name of the channel to dispatch to. Will be created if it doesn't exit.
-     * @param target {@link EventTarget} to watch for events of {@link eventType}.
+     * @param target EventTarget to watch for events of {@link eventType}.
      * @param eventType Type of event to watch for on {@link target}.
      * @param [processor] Callback to convert events from {@link target} into the appropriate payload for {@link channel}. Defaults to simply returning the entire event object.
      */
@@ -176,7 +176,7 @@ export default class Hub extends EventTarget {
 	}
 
 	/**
-	 * Get a set of messages that were already sent to the channel.
+	 * Get a set of {@link message!default Messages} that were already sent to the channel.
 	 *
 	 * Messages are returned in reverse chronological order (most recent -> oldest),
 	 *

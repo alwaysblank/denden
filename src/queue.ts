@@ -24,11 +24,11 @@ const isQueueRecord = <Payload>(record: unknown): record is QueueRecord<Payload>
 }
 
 /**
- * Returns a proxy for event `queuedMessages`, and calls `callback()` on each row in `queuedMessages` as well as any time a new row is added to the proxy.
+ * Returns a proxy for event {@link queuedMessages} and calls {@link callback} on each row in `queuedMessages` as well as any time a new row is added to the proxy.
  *
  * @param callback Called on each row, either when the queue is created or when the row is added.
  * @param queuedMessages Array of messages with the name of the channel they are associated with.
- * @param hub {@link Hub} that this queue is associated with.
+ * @param hub {@link hub!default Hub} that this queue is associated with.
  */
 export default function<Payload>(hub: Hub, callback: QueueCallback<Payload>, queuedMessages: Array<QueueRecord<Payload>>) {
     for (const msg of queuedMessages) {
