@@ -3,8 +3,19 @@ import {match, sortByProp} from "./tools";
 
 export type ChannelRoute = string | RegExp;
 
+/**
+ * Describes a channel on the {@link Hub}.
+ *
+ * The `name` property is not writeable.
+ */
 export type Channel = Array<Message> & {name: string};
 
+/**
+ * The value returned by a callback passed to {@link Hub.sub}.
+ *
+ * Essentially this is just to say "it can be anything, or a Promise that
+ * returns anything" so that consuming logic can handle both cases.
+ */
 export type CallbackResult = any|Promise<any>;
 
 /**
@@ -16,11 +27,27 @@ export type CallbackResult = any|Promise<any>;
  */
 export type Callback<Payload> = (payload: Payload, message: Message<Payload>, unsub: (reason?: string) => void) => unknown;
 
+/**
+ * Callback to {@link Hub.watch} to convert an event to a payload suitable for dispatch to a channel.
+ */
 export type WatchProcessor<Payload> = (event: Event) => Payload;
 
+/**
+ * The value returns by the {@link Hub.pub} Promise.
+ *
+ * @property payload The payload of the message(s) that were published. All callbacks processed this same payload.
+ * @property results The results of any callbacks that were invoked when publishing the message(s).
+ */
 export type PubResult = {payload: unknown, results: Array<unknown>};
 
-type MessageQuery = {
+/**
+ * Describes a query to {@link Hub.getMessages} for messages.
+ *
+ * @property cid - A argument (or array of arguments) which can resolve to channel names.
+ * @property [limit=1] - The number of messages to return.
+ * @property [order='DESC'] - Messages are sorted by order of dispatch: `ASC` is oldest -> newest, `DESC` is newest -> oldest.
+ */
+export type MessageQuery = {
 	cid: ChannelRoute|ChannelRoute[],
 	order?: 'ASC' | 'DESC';
 	limit?: number;
@@ -44,7 +71,7 @@ export default class Hub extends EventTarget {
 	 * This method attempts to call `listener` for all historical messages
 	 * in the order in which they were received, but it is theoretically
 	 * possible to construct a circumstance in which messages might be
-	 * received out of order. {@link Message#order} will always be greater
+	 * received out of order. {@link Message.order} will always be greater
 	 * for messages that have been dispatched more recently. However, it is
 	 * a generally good practice for `listener` to be idempotent.
 	 *
@@ -72,6 +99,11 @@ export default class Hub extends EventTarget {
 
 	/**
 	 * Publish a message to a particular channel, or channels.
+	 *
+	 * Returns a Promise which resolves when all callbacks attached to
+	 * {@link routes} have completed. If a callback thr
+	 *
+	 * Callbacks which returned `void` or `undefined` will have the value `true`.
 	 *
 	 * @param routes Channel route (i.e., a channel name, wildcard string, or {@link RegExp}) to publish to, or an array of the same.
 	 * 		Routes which are not fully-qualified (i.e., they are a wildcard string or a regular expression) will only
@@ -153,7 +185,7 @@ export default class Hub extends EventTarget {
 	 * @param [query.limit=1] - The number of messages to return.
 	 * @param [query.order='DESC'] - Messages are sorted by order of dispatch: `ASC` is oldest -> newest, `DESC` is newest -> oldest.
 	 *
-	 * @return All messages from matching channel(s) which match {@link getMessages}. The `Message.channel` property contains a reference to the {@link Channel} that an individual message came from.
+	 * @return All messages from matching channel(s) which match {@link query}.
 	 */
 	getMessages(query: MessageQuery): Message[] {
 		const {

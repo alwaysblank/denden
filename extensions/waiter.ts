@@ -17,6 +17,25 @@ const SUCCESS = {
 }
 
 /**
+ * @overload
+ *
+ * @param hub The {@link Hub} instance to which this will subscribe.
+ * @param waitTime Time in milliseconds to wait for a message before timing out.
+ * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
+ *
+ * @returns Promise
+ */
+function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
+/**
+ * @overload
+ *
+ * @param hub The {@link Hub} instance to which this will subscribe.
+ * @param waitTime Time in milliseconds to wait for a message before timing out.
+ * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
+ * @param [callback] If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
+ */
+function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
+/**
  * Wait for the first message(s) sent to the specified {@link routes}, within the specified timeout.
  *
  * If passed a {@link callback}, it will invoke that callback when all messages have been captured or
@@ -52,8 +71,6 @@ const SUCCESS = {
  *
  * @return Promise if `callback` is passed; void otherwise.
  */
-function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
-function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
 function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?: (results: WaitForResults<T>) => void): Promise<WaitForResults<T>> | void {
     if (!callback) {
         return new Promise(resolve => {
@@ -91,11 +108,30 @@ function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?:
 }
 
 /**
+ * @overload
+ *
+ * @param hub The {@link Hub} instance to which this will subscribe.
+ * @param waitTime Time in milliseconds to wait for a message before timing out.
+ * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
+ *
+ * @returns Promise
+ */
+function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
+/**
+ * @overload
+ *
+ * @param hub The {@link Hub} instance to which this will subscribe.
+ * @param waitTime Time in milliseconds to wait for a message before timing out.
+ * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
+ * @param [callback] If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
+ */
+function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
+/**
  * Wait for all specified {@link routes} to receive at least one message, and return a set of the most recent.
  *
  * This function is essentially identical in behavior to {@link first} except that it will return the *last* messages
  * sent to every route, instead of the first. The usual use case here would be if you are listening to more than one
- * route, and expect one (or more) of those routes to send several messages before all have completed.
+ * route and expect one (or more) of those routes to send several messages before all have completed.
  *
  * @see first
  *
@@ -106,8 +142,6 @@ function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?:
  *
  * @return Promise if `callback` is passed; void otherwise.
  */
-function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
-function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
 function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?: (results: WaitForResults<T>) => void): Promise<WaitForResults<T>> | void {
     if (!callback) {
         return new Promise(resolve => {
