@@ -112,7 +112,11 @@ export default class Hub extends EventTarget {
 							return new Error(result.reason);
 					}
 				})
-			}).then(succeeded, failed);
+			})
+				.then(succeeded, failed)
+				.finally(() => {
+					this.running.delete(contains)
+				});
 		});
 	}
 
