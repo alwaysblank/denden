@@ -1,4 +1,4 @@
-import Message from './message';
+import {Message} from './message';
 import {match, sortByProp} from "./tools";
 
 export type ChannelRoute = string | RegExp;
@@ -56,7 +56,7 @@ export type MessageQuery = {
 /**
  * Hub for sending and registering to receive messages.
  */
-export default class Hub extends EventTarget {
+export class Hub extends EventTarget {
 	private channels: Map<string, Channel> = new Map();
 	private running: WeakMap<{payload: unknown}, Array<CallbackResult>> = new WeakMap();
 

@@ -1,4 +1,4 @@
-import Message from "../src/message";
+import {Message} from '../src/message';
 
 describe('Message', () => {
    it('should return a message', () => {

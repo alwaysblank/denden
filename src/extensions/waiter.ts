@@ -1,4 +1,4 @@
-import type Hub from "../hub";
+import type { Hub } from "../hub";
 import type { ChannelRoute } from "../hub";
 
 /**
@@ -25,6 +25,7 @@ const ERRORS = {
 const SUCCESS = {
     ALL_RECEIVED: 'ALL_ROUTES_RECEIVED',
 }
+
 /**
  * Wait for the first message(s) sent to the specified {@link routes}, within the specified timeout.
  *
@@ -57,10 +58,12 @@ const SUCCESS = {
  * @param hub The {@link Hub} instance to which this will subscribe.
  * @param waitTime Time in milliseconds to wait for a message before timing out.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- * @param callback If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
+ * @param [callback] If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
  *
  * @return Promise if `callback` is passed; void otherwise.
  */
+function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
+function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
 function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?: (results: WaitForResults<T>) => void): Promise<WaitForResults<T>> | void {
     if (!callback) {
         return new Promise(resolve => {
@@ -113,6 +116,8 @@ function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?:
  *
  * @return Promise if `callback` is passed; void otherwise.
  */
+function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
+function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
 function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?: (results: WaitForResults<T>) => void): Promise<WaitForResults<T>> | void {
     if (!callback) {
         return new Promise(resolve => {

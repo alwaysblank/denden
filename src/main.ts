@@ -1,6 +1,7 @@
-import Hub, {
+import {
 	Callback,
 	CallbackError,
+	Hub,
 } from './hub';
 import type {
 	CallbackResult,
@@ -11,8 +12,8 @@ import type {
 	PubResult,
 	WatchProcessor,
 } from './hub';
-import Message from './message';
-import queue from './queue';
+import {Message} from './message';
+import {queue} from './queue';
 import {sortByProp, match, getAffix, reverseString} from './tools';
 
 export {

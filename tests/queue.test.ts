@@ -1,11 +1,15 @@
-import Hub from "../src/hub";
-import createQueue from "../src/queue";
+import {Hub} from '../src/hub';
+import {queue} from '../src/queue';
 import {expect} from "@jest/globals";
 jest.mock("../src/hub", () => {
-    return jest.fn().mockImplementation(() => ({
-            send: jest.fn(),
-            pub: jest.fn(),
-    }))
+	return {
+		__esModule: true,
+		...jest.requireActual("../src/hub"),
+		Hub: jest.fn().mockImplementation(() => ({
+			sub: jest.fn(),
+			pub: jest.fn(),
+		})),
+	}
 });
 
 afterEach(() => {
@@ -17,7 +21,7 @@ describe('First Run', () => {
         expect.assertions(3);
         const hub = new Hub();
         const cb = jest.fn();
-        const q = createQueue(hub, cb,[
+        queue(hub, cb,[
             ['test', 'value'],
             ['sandwich', 'reuben'],
         ]);
@@ -30,7 +34,7 @@ describe('First Run', () => {
         expect.assertions(3);
         const hub = new Hub();
         const cb = jest.fn();
-        const q = createQueue(hub, cb,[
+        queue(hub, cb,[
             // @ts-expect-error -- Intended to be wrong; we are testing runtime behave not governed by TypeScript.
             [1],
             ['test', 'value'],
@@ -45,7 +49,7 @@ describe('First Run', () => {
 
     it('should contain all initial load message', () => {
         const hub = new Hub();
-        const q = createQueue(hub, jest.fn(), [
+        const q = queue(hub, jest.fn(), [
             ['test', 'value'],
             ['sandwich', 'reuben'],
         ]);
@@ -60,7 +64,7 @@ describe('Additional Records', () => {
     it('should dispatch for items added after initialization', () => {
         const hub = new Hub();
         const cb = jest.fn();
-        const q = createQueue(hub, cb, []);
+        const q = queue(hub, cb, []);
         expect(cb).toHaveBeenCalledTimes(0);
         q.push(['sandwich', 'reuben']);
         expect(cb).toHaveBeenCalledTimes(1);
@@ -73,7 +77,7 @@ describe('Additional Records', () => {
     it('should ignore pushes which are invalid records', () => {
         const hub = new Hub();
         const cb = jest.fn();
-        const q = createQueue(hub, cb, []);
+        const q = queue(hub, cb, []);
         expect(cb).toHaveBeenCalledTimes(0);
         // @ts-expect-error -- We're testing intentionally invalid values, since this can be called client-side where TS won't apply.
         q.push('sandwich');

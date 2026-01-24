@@ -1,5 +1,5 @@
-import Hub, {CallbackError, ErrorEvent} from '../src/hub';
-import Message from '../src/message';
+import {CallbackError, ErrorEvent, Hub} from '../src/hub';
+import {Message} from '../src/message';
 import {describe, expect} from '@jest/globals';
 import "../definitions/toHaveChannel.d.ts"
 

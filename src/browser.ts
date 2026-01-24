@@ -1,5 +1,5 @@
-import Hub from './hub';
-import createQueue, {QueueRecord} from "./queue";
+import {Hub} from './hub';
+import {queue, QueueRecord} from "./queue";
 
 declare global {
     interface Window {
@@ -10,7 +10,7 @@ declare global {
 
 window.denden = new Hub();
 if ('_dendenQueue' in window && Array.isArray(window._dendenQueue)) {
-    window._dendenQueue = createQueue(window.denden, (hub, record) => {
+    window._dendenQueue = queue(window.denden, (hub, record) => {
         const [channel, payload] = record;
         hub.pub(channel, payload);
     }, window._dendenQueue);

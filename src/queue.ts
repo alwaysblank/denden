@@ -1,4 +1,4 @@
-import Hub from "./hub";
+import { Hub } from './hub';
 
 /**
  * Record in the queue array.
@@ -28,9 +28,9 @@ const isQueueRecord = <Payload>(record: unknown): record is QueueRecord<Payload>
  *
  * @param callback Called on each row, either when the queue is created or when the row is added.
  * @param queuedMessages Array of messages with the name of the channel they are associated with.
- * @param hub {@link hub!default Hub} that this queue is associated with.
+ * @param hub {@link Hub} that this queue is associated with.
  */
-export default function<Payload>(hub: Hub, callback: QueueCallback<Payload>, queuedMessages: Array<QueueRecord<Payload>>) {
+export function queue<Payload>(hub: Hub, callback: QueueCallback<Payload>, queuedMessages: Array<QueueRecord<Payload>>) {
     for (const msg of queuedMessages) {
         if (isQueueRecord(msg)) {
             callback(hub, msg);

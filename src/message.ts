@@ -1,7 +1,8 @@
+import {Hub} from './hub';
 /**
  * An Event carrying some kind of data.
  */
-export default class Message<Payload extends any = any> extends Event {
+export class Message<Payload extends any = any> extends Event {
 	static NAME = 'ddm::event::message';
 	static #order: number = 0;
 
@@ -9,7 +10,7 @@ export default class Message<Payload extends any = any> extends Event {
 	 * A value used to order messages.
 	 *
 	 * Strictly speaking, it is set on Message creation, not on Message
-	 * dispatch, but when using the methods {@link hub!default.pub Hub.pub()} or {@link hub!default.watch Hub.watch()}
+	 * dispatch, but when using the methods {@link Hub.pub} or {@link Hub.watch}
 	 * Messages are created at the time of dispatch.
 	 */
 	public readonly order: number;
@@ -30,7 +31,7 @@ export default class Message<Payload extends any = any> extends Event {
 	 * The {@link Channel} on which this Message was originally dispatched.
 	 *
 	 * This can be relevant because in some situations (i.e. when calling
-	 * {@link hub!default.getMessages Hub.getMessages()} or {@link hub!default.sub Hub.sub()}) Messages can be returned from
+	 * {@link Hub.getMessages Hub.getMessages()} or {@link Hub.sub}) Messages can be returned from
 	 * across several channels.
 	 */
 	public readonly channel: string;
@@ -40,9 +41,9 @@ export default class Message<Payload extends any = any> extends Event {
 	 *
 	 * The constructor allows you to directly specify the {@link Message.contains}
 	 * object, which may be useful if creating multiple Messages across different
-	 * {@link !hub.Channel Channels} with the same payload.
+	 * channels with the same payload.
 	 *
-	 * @param channel The {@link Channel} on which this message is *originally* to be dispatched.
+	 * @param channel Name of the channel on which this message is *originally* to be dispatched.
 	 * @param payload Object containing the payload.
 	 */
 	constructor(channel: string, payload: {payload: Payload}) {
@@ -62,7 +63,7 @@ export default class Message<Payload extends any = any> extends Event {
 	/**
 	 * Create a new Message.
 	 *
-	 * @param channel The {@link Channel} on which this message is *originally* to be dispatched.
+	 * @param channel The  on which this message is *originally* to be dispatched.
 	 * @param payload The data being carried by this message.
 	 */
 	static create<Payload extends any>(channel: string, payload: Payload): Message<Payload> {
