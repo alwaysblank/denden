@@ -1,4 +1,4 @@
-import Hub from '../src/hub';
+import Hub, {CallbackError, ErrorEvent} from '../src/hub';
 import Message from '../src/message';
 import {describe, expect} from '@jest/globals';
 import "../definitions/toHaveChannel.d.ts"
@@ -100,58 +100,60 @@ describe('Subscribing & Publishing', () => {
         expect(callback).toHaveBeenCalledTimes(0);
     });
 
-    it('should allow unsubscribing from a channel, preventing any further callbacks', () => {
-        const hub = new Hub();
-        const callback = jest.fn();
-        const unsub = hub.sub('test', callback);
-        hub.pub('test', 'sandwich');
-        expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
-        expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(1)
-        unsub();
-        hub.pub('test', 'hamburger');
-        expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
-        expect(callback).not.toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
-        expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(2);
+	describe('unsubscribing', () => {
+		it('should prevent further callback invocations', () => {
+			const hub = new Hub();
+			const callback = jest.fn();
+			const unsub = hub.sub('test', callback);
+			hub.pub('test', 'sandwich');
+			expect(callback).toHaveBeenCalledTimes(1);
+			expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
+			expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(1)
+			unsub();
+			hub.pub('test', 'hamburger');
+			expect(callback).toHaveBeenCalledTimes(1);
+			expect(callback).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
+			expect(callback).not.toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
+			expect(hub.getMessages({cid:'test', limit: Infinity})).toHaveLength(2);
 
-        const inner = jest.fn();
-        hub.sub('test', (payload, channel, unsub) => {
-            inner(payload, channel);
-            unsub();
-        });
-        hub.pub('test', 'salad');
-        hub.pub('test', 'ice cream');
-        expect(inner).toHaveBeenCalledTimes(1);
-        expect(inner).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'));
-        expect(inner).not.toHaveBeenCalledWith('ice cream', expect.toHaveChannel('test'));
-    });
+			const inner = jest.fn();
+			hub.sub('test', (payload, channel, unsub) => {
+				inner(payload, channel);
+				unsub();
+			});
+			hub.pub('test', 'salad');
+			hub.pub('test', 'ice cream');
+			expect(inner).toHaveBeenCalledTimes(1);
+			expect(inner).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'));
+			expect(inner).not.toHaveBeenCalledWith('ice cream', expect.toHaveChannel('test'));
+		});
 
-    it('should allow unsubscribing while parsing previous message', () => {
-        const hub = new Hub();
-        const once = jest.fn();
-        const all = jest.fn();
-        hub.pub('test', 'sandwich');
-        hub.pub('test', 'hamburger');
-        hub.pub('test', 'salad');
+		it('should prevent processing of additional backlog messages', () => {
+			const hub = new Hub();
+			const once = jest.fn();
+			const all = jest.fn();
+			hub.pub('test', 'sandwich');
+			hub.pub('test', 'hamburger');
+			hub.pub('test', 'salad');
 
-        let i = 0;
-        hub.sub('test', (payload, channel, unsub) => {
-            if (i++ > 0) {
-                return unsub();
-            }
-            once(payload, channel, unsub);
-        }, 3);
-        hub.sub('test', all, 4);
+			let i = 0;
+			hub.sub('test', (payload, channel, unsub) => {
+				if (i++ > 0) {
+					return unsub();
+				}
+				once(payload, channel, unsub);
+			}, 3);
+			hub.sub('test', all, 4);
 
-        expect(once).toHaveBeenCalledTimes(1);
-        expect(once).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
+			expect(once).toHaveBeenCalledTimes(1);
+			expect(once).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
 
-        expect(all).toHaveBeenCalledTimes(3);
-        expect(all).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
-        expect(all).toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
-        expect(all).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
-    })
+			expect(all).toHaveBeenCalledTimes(3);
+			expect(all).toHaveBeenCalledWith('salad', expect.toHaveChannel('test'), expect.any(Function));
+			expect(all).toHaveBeenCalledWith('hamburger', expect.toHaveChannel('test'), expect.any(Function));
+			expect(all).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
+		});
+	});
 
     it('should allow only valid messages to be sent to a subscriber callback', () => {
         const hub = new Hub();
@@ -171,11 +173,9 @@ describe('Subscribing & Publishing', () => {
         hub.dispatchEvent(evt);
         expect(callback).toHaveBeenCalledTimes(0);
 
-        // We have to do this because Hub doesn't expose a way to insert a channel by itself--it doesn't need to.
-		hub.channel('test');
+		hub.makeChannel('test');
 
-        // We have to do this because Hub doesn't give us public access to the channels it tracks--we shouldn't need that normally, and we don't want people messing with them.
-        const msg = Message.create(hub.channel('test').name, 'valid message');
+        const msg = Message.create('test', 'valid message');
 
         // We finally send a valid message!
         hub.dispatchEvent(msg);
@@ -183,86 +183,195 @@ describe('Subscribing & Publishing', () => {
         expect(callback).toHaveBeenCalledWith('valid message', expect.toHaveChannel('test'), expect.any(Function));
     });
 
-    it('should allow publishing to multiple channels', () => {
-       const hub = new Hub();
-       const cb1 = jest.fn();
-       const cb2 = jest.fn();
+	describe('multi-channel publishing', () => {
+		it('should publish messages to multiple channels at once', () => {
+			const hub = new Hub();
+			const cb1 = jest.fn();
+			const cb2 = jest.fn();
 
-       hub.sub('test', cb1);
-       hub.sub('sandwich', cb2);
+			hub.sub('test', cb1);
+			hub.sub('sandwich', cb2);
 
-       hub.pub(['test', 'sandwich'], 'payload');
+			hub.pub(['test', 'sandwich'], 'payload');
 
-       expect(cb1).toHaveBeenCalledTimes(1);
-       expect(cb1).toHaveBeenCalledWith('payload', expect.toHaveChannel('test'), expect.any(Function));
-       expect(cb2).toHaveBeenCalledTimes(1);
-       expect(cb2).toHaveBeenCalledWith('payload', expect.toHaveChannel('sandwich'), expect.any(Function));
-    });
-
-	it('promise returned by pub() contains callback returns in call order', (done) => {
-		jest.useFakeTimers();
-		expect.assertions(5);
-		const hub = new Hub();
-		const cb1 = jest.fn(() => {
-			return 'one';
+			expect(cb1).toHaveBeenCalledTimes(1);
+			expect(cb1).toHaveBeenCalledWith('payload', expect.toHaveChannel('test'), expect.any(Function));
+			expect(cb2).toHaveBeenCalledTimes(1);
+			expect(cb2).toHaveBeenCalledWith('payload', expect.toHaveChannel('sandwich'), expect.any(Function));
 		});
-		const cb2 = jest.fn(() => {
-			return new Promise(resolve => setTimeout(() => resolve('two'), 1000));
-		});
-		const cb3 = jest.fn(() => {
-			return new Promise((_, reject) => setTimeout(() => reject('three'), 1000));
-		});
-		const cb4 = jest.fn(() => {
-			return 'four';
-		});
-		hub.sub('test', cb1);
-		hub.sub('test', cb2);
-		hub.sub('test', cb3);
-		hub.sub('test', cb4);
-
-		hub.pub('test', 'published value')
-			.then(results => {
-				expect(cb1).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
-				expect(cb2).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
-				expect(cb3).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
-				expect(cb4).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
-				expect(results).toStrictEqual(['one', 'two', expect.objectContaining({message: 'three'}), 'four']);
-				done();
-			});
-
-		jest.advanceTimersByTime(1000);
 	});
 
-	it('hub() promise contains only returns for that event', () => {
-		const hub = new Hub();
-		const returnFalse = () => false;
-		const returnTrue = () => true;
-		const returnFive = () => 5;
-		const returnTen = () => 10;
+	describe('callback resolution', () => {
+		it('should return callback results in call order', (done) => {
+			jest.useFakeTimers();
+			expect.assertions(5);
+			const hub = new Hub();
+			const cb1 = jest.fn(() => {
+				return 'one';
+			});
+			const cb2 = jest.fn(() => {
+				return new Promise(resolve => setTimeout(() => resolve('two'), 1000));
+			});
+			const cb3 = jest.fn(() => {
+				return new Promise((_, reject) => setTimeout(() => reject('three'), 1000));
+			});
+			const cb4 = jest.fn(() => {
+				return 'four';
+			});
+			hub.sub('test', cb1);
+			hub.sub('test', cb2);
+			hub.sub('test', cb3);
+			hub.sub('test', cb4);
 
-		hub.sub('test/1', returnFalse);
+			hub.pub('test', 'published value')
+				.then(results => {
+					expect(cb1).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
+					expect(cb2).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
+					expect(cb3).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
+					expect(cb4).toHaveBeenCalledWith('published value', expect.toHaveChannel('test'), expect.any(Function));
+					expect(results).toStrictEqual(['one', 'two', expect.objectContaining({message: 'three'}), 'four']);
+					done();
+				});
 
-		hub.pub('test/1', 'published value')
-			.then(result => {
-				expect(result).toStrictEqual([false]);
+			jest.advanceTimersByTime(1000);
+		});
+
+		it('should contain only results for the specified payload', () => {
+			const hub = new Hub();
+			const returnFalse = () => false;
+			const returnTrue = () => true;
+			const returnFive = () => 5;
+			const returnTen = () => 10;
+
+			hub.sub('test/1', returnFalse);
+
+			hub.pub('test/1', 'published value')
+				.then(result => {
+					expect(result).toStrictEqual([false]);
+				})
+
+			const unsub = hub.sub('test/1', returnTen);
+
+			hub.pub('test/1', 'published value')
+				.then(result => {
+					expect(result).toStrictEqual([false, 10]);
+				})
+
+			unsub();
+
+			hub.sub('test/1', returnTrue)
+			hub.sub('test/1', returnFive);
+
+			hub.pub('test/1', 'published value')
+				.then(result => {
+					expect(result).toStrictEqual([false, true, 5]);
+				})
+		});
+
+		it('should not consider strictly-equal payloads on different messages to be the same', () => {
+			expect.assertions(2);
+			const hub = new Hub();
+			const payloadScalar = 'payload';
+
+			hub.sub('test/1', (payload) => `cb1: ${payload}`);
+			hub.sub('test/2', (payload) => `cb2: ${payload}`);
+
+			hub.pub('test/1', payloadScalar)
+				.then(result => {
+					expect(result).toStrictEqual(['cb1: payload']);
+				});
+			hub.pub('test/2', payloadScalar)
+				.then(result => {
+					expect(result).toStrictEqual(['cb2: payload']);
+				});
+		});
+
+		it('should clear list of running commands all have been processed', async () => {
+			expect.assertions(9);
+			const hub = new Hub();
+			const payloadScalar = 'payload';
+			// @ts-expect-error -- We're accessing a private field here for testing purposes.
+			const running = hub.running;
+			let contains: {payload: any} = {payload: false};
+
+			hub.sub('test', (payload, message) => {
+				expect(payload).toEqual(payloadScalar);
+				contains = message.contains;
+				expect(running.get(contains)).toBeUndefined();
+				return 'cb1';
 			})
+			hub.sub('test', (payload, message) => {
+				expect(payload).toEqual(payloadScalar);
+				contains = message.contains;
+				expect(running.get(contains)).toStrictEqual(['cb1'])
+				return 'cb2';
+			});
 
-		const unsub = hub.sub('test/1', returnTen);
+			expect(running.get(contains)).toBeUndefined();
+			const result = hub.pub('test', payloadScalar);
+			expect(running.get(contains)).toStrictEqual(['cb1', 'cb2']);
+			await result.then(success => {
+				// Because cleanup happens in the `finally()` clause, the full list of callbacks is still available at this point.
+				expect(running.get(contains)).toStrictEqual(['cb1', 'cb2']);
+				expect(success).toStrictEqual(['cb1', 'cb2']);
+			});
+			expect(running.get(contains)).toBeUndefined();
+		});
+	});
 
-		hub.pub('test/1', 'published value')
-			.then(result => {
-				expect(result).toStrictEqual([false, 10]);
-			})
+	describe('error handling', () => {
+		it('should capture report errors returned by subscribers', () => {
+			expect.assertions(6);
+			const hub = new Hub();
+			hub.sub('test', () => 'cb1');
+			hub.sub('test', () => {throw new Error('cb2')});
+			hub.sub('test', () => 'cb2');
+			hub.pub('test', 'published value')
+				.then(success => {
+					expect(success.length).toBe(3);
+					const [cb1, cb2, cb3] = success as [string, CallbackError, string];
+					expect(cb1).toBe('cb1');
+					expect(cb2).toBeInstanceOf(CallbackError);
+					expect(cb2.message).toBe(CallbackError.NAME);
+					expect(cb2.cause).toBeInstanceOf(Error);
+					expect(cb3).toBe('cb2');
+				});
+		});
 
-		unsub();
+		it('should dispatch an event when an error is thrown', () => {
+			expect.assertions(3);
+			const hub = new Hub();
+			const err = new Error('cb1');
+			hub.sub('test', () => {throw err});
+			hub.addEventListener(ErrorEvent.NAME, (e) => {
+				const error = e as ErrorEvent;
+				expect(error).toBeInstanceOf(ErrorEvent);
+				expect(error.cause).toBeInstanceOf(CallbackError);
+				expect(error.cause.cause).toBe(err);
+			});
+			hub.pub('test', 'published value');
+		});
 
-		hub.sub('test/1', returnTrue)
-		hub.sub('test/1', returnFive);
-
-		hub.pub('test/1', 'published value')
-			.then(result => {
-				expect(result).toStrictEqual([false, true, 5]);
-			})
+		it('should handle non-error thrown values', () => {
+			const hub = new Hub();
+			const thrown = {msg: 'throw me'};
+			hub.sub('test', () => {throw thrown});
+			hub.addEventListener(ErrorEvent.NAME, (e) => {
+				const errorEvent = e as ErrorEvent;
+				expect(errorEvent).toBeInstanceOf(ErrorEvent);
+				expect(errorEvent.cause).toBeInstanceOf(Error);
+				expect(errorEvent.cause.message).toBe('Caught a non-Error error');
+				expect(errorEvent.cause.cause).toBeInstanceOf(CallbackError);
+				expect((errorEvent.cause.cause as CallbackError).cause).toBe(thrown);
+			});
+			hub.pub('test', 'published value')
+				.then(success => {
+					const [error] = success;
+					expect(error).toHaveProperty('message', CallbackError.NAME);
+					expect(error).toHaveProperty('cause', thrown);
+					return;
+				});
+		})
 	});
 });
 
@@ -282,6 +391,18 @@ describe('Other message sources', () => {
         expect(callback).toHaveBeenCalledTimes(1);
         expect(hub.getMessages({cid:'emitter', limit: Infinity})).toHaveLength(1);
     });
+
+	it('should pass alongf the entire event if no callback is provided', () => {
+		const emitter = new EventTarget();
+		const hub = new Hub();
+		const cb = jest.fn();
+		hub.watch('emitter', emitter, 'test');
+		hub.sub('emitter', cb);
+		const event = new Event('test');
+		emitter.dispatchEvent(event);
+		expect(cb).toHaveBeenCalledTimes(1);
+		expect(cb).toHaveBeenCalledWith(event, expect.toHaveChannel('emitter'), expect.any(Function));
+	});
 });
 
 describe('Retrieving messages directly', () => {
@@ -346,3 +467,14 @@ describe('Retrieving messages directly', () => {
         expect(empty).toEqual([]);
     });
 });
+
+describe('Channel management', () => {
+	it('should reject non-Message events', () => {
+		expect.assertions(1);
+		const hub = new Hub();
+		// @ts-expect-error -- We want to deal with a channel directly for testing purposes.
+		const channel = hub.channel('test');
+		// @ts-expect-error -- We want to test a bad event type.
+		expect(() => channel.push(new Event('not a message'))).toThrowError(new Error('Channels can only contain Messages.'));
+	});
+})

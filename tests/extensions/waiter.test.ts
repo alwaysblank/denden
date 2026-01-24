@@ -11,7 +11,7 @@ describe('first', () => {
 			expect(results).toContainEqual(['test', 'value']);
 			expect(results).toContainEqual(['sandwich', 'reuben']);
 		});
-        first(hub, undefined, ['test', 'sandwich']).then((results) => {
+        first(hub, -1, ['test', 'sandwich']).then((results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'reuben']);
         })
@@ -51,7 +51,7 @@ describe('first', () => {
 			expect(results).toContainEqual(['test', 'value']);
 			expect(results).toContainEqual(['sandwich', 'reuben']);
 		});
-        first(hub, undefined, ['test', 'sandwich']).then((results) => {
+        first(hub, -1, ['test', 'sandwich']).then((results) => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'reuben']);
         })
@@ -76,7 +76,7 @@ describe('latest', () => {
 			expect(results).toContainEqual(['test', 'value']);
 			expect(results).toContainEqual(['sandwich', 'club']);
 		});
-        latest(hub, undefined, ['test', 'sandwich']).then(results => {
+        latest(hub, -1, ['test', 'sandwich']).then(results => {
             expect(results).toContainEqual(['test', 'value'] );
             expect(results).toContainEqual(['sandwich', 'club']);
         })
