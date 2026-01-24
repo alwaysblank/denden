@@ -2,7 +2,7 @@
  * An Event carrying some kind of data.
  */
 export default class Message<Payload extends any = any> extends Event {
-	static NAME = 'ddm';
+	static NAME = 'ddm::event::message';
 	static #order: number = 0;
 
 	/**
