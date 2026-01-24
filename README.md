@@ -1,20 +1,8 @@
 # Den Den
 
-Extremely simple publish/subscribe system built on events and nothing else.
+Extremely simple publish/subscribe system built on events.
 
 Designed for the browser, but should work in an JS context that supports events.
-
-## Examples
-
-```javascript
-const hub = new Hub();
-
-hub.sub('recipes', (payload) => console.log(payload) );
-
-hub.pub('recipes', 'add eggs');
-
-// "add eggs"
-```
 
 ## Installation
 
@@ -46,6 +34,17 @@ window.denden.pub('sandwich', 'club');
 ```
 
 ## Examples
+
+```ts
+const hub = new Hub();
+
+hub.sub('recipes', (payload) => console.log(payload) );
+
+hub.pub('recipes', 'add eggs');
+
+// "add eggs"
+```
+
 
 **Allow hooking into behavior via `sub()`**
 
