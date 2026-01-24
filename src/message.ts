@@ -1,3 +1,5 @@
+import type Hub from "./hub";
+
 /**
  * An Event carrying some kind of data.
  */
@@ -17,12 +19,12 @@ export default class Message<Payload extends any = any> extends Event {
 	/**
 	 * An object containing the payload.
 	 *
-	 * Generally you don't want to access this; you want to access {@link Message.payload}.
+	 * Generally you don't want to access this; you want to access {@link payload}.
 	 * This is an object because we want to be able to use it as a unique
-	 * identifier for Messages (largely for {@link Hub.running}). Different
-	 * messages would have the same scalar payload but be meaningfully
-	 * distinct. Object equality in JS, however, means that ever object can
-	 * be distinct, even if the actual payloads are the same.
+	 * identifier for Messages. Different messages would have the same scalar
+	 * payload but be meaningfully distinct. Object equality in JS, however,
+	 * means that ever object can be distinct, even if the actual payloads are
+	 * the same.
 	 */
 	public readonly contains: {payload: Payload};
 

@@ -1,40 +1,30 @@
-import type Hub from "../src/hub";
-import type { ChannelRoute } from "../src/hub";
+import type Hub from "../hub";
+import type { ChannelRoute } from "../hub";
 
+/**
+ * A single result from a {@link first} or {@link latest} operation.
+ */
 type WaitForResult<T> = [ChannelRoute, T];
 
-interface WaitForResults<T> extends Array<WaitForResult<T>> {
-    failed?: Array<[ChannelRoute, string]>,
-}
+/**
+ * The results from a {@link first} or {@link latest} operation.
+ */
+type WaitForResults<T> = Array<WaitForResult<T>> & {failed?: Array<[ChannelRoute, string]>};
 
+/**
+ * Enum defining error codes for {@link first} and {@link latest} functions.
+ */
 const ERRORS = {
     TIMED_OUT_SINGLE: 'TIMED OUT',
     TIMED_OUT_ALL: 'ALL ROUTES TIMED OUT',
 };
 
+/**
+ * Enum defining success codes for {@link first} and {@link latest} functions.
+ */
 const SUCCESS = {
     ALL_RECEIVED: 'ALL_ROUTES_RECEIVED',
 }
-
-/**
- * @overload
- *
- * @param hub The {@link Hub} instance to which this will subscribe.
- * @param waitTime Time in milliseconds to wait for a message before timing out.
- * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- *
- * @returns Promise
- */
-function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
-/**
- * @overload
- *
- * @param hub The {@link Hub} instance to which this will subscribe.
- * @param waitTime Time in milliseconds to wait for a message before timing out.
- * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- * @param [callback] If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
- */
-function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
 /**
  * Wait for the first message(s) sent to the specified {@link routes}, within the specified timeout.
  *
@@ -67,7 +57,7 @@ function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: 
  * @param hub The {@link Hub} instance to which this will subscribe.
  * @param waitTime Time in milliseconds to wait for a message before timing out.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- * @param [callback] If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
+ * @param callback If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
  *
  * @return Promise if `callback` is passed; void otherwise.
  */
@@ -107,25 +97,6 @@ function first<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback?:
     });
 }
 
-/**
- * @overload
- *
- * @param hub The {@link Hub} instance to which this will subscribe.
- * @param waitTime Time in milliseconds to wait for a message before timing out.
- * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- *
- * @returns Promise
- */
-function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[]): Promise<WaitForResults<T>>;
-/**
- * @overload
- *
- * @param hub The {@link Hub} instance to which this will subscribe.
- * @param waitTime Time in milliseconds to wait for a message before timing out.
- * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- * @param [callback] If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
- */
-function latest<T>(hub: Hub, waitTime: number, routes: ChannelRoute[], callback: (results: WaitForResults<T>) => void): void;
 /**
  * Wait for all specified {@link routes} to receive at least one message, and return a set of the most recent.
  *
