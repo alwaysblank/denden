@@ -71,7 +71,7 @@ export class Hub extends EventTarget {
 	 * This method attempts to call `listener` for all historical messages
 	 * in the order in which they were received, but it is theoretically
 	 * possible to construct a circumstance in which messages might be
-	 * received out of order. {@link message!default.order Message.order} will always be greater
+	 * received out of order. {@link Message.order} will always be greater
 	 * for messages that have been dispatched more recently. However, it is
 	 * a generally good practice for `listener` to be idempotent.
 	 *
@@ -176,7 +176,7 @@ export class Hub extends EventTarget {
 	}
 
 	/**
-	 * Get a set of {@link message!default Messages} that were already sent to the channel.
+	 * Get a set of {@link Message} that were already sent to the channel.
 	 *
 	 * Messages are returned in reverse chronological order (most recent -> oldest),
 	 *

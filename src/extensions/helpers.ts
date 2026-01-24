@@ -1,4 +1,4 @@
-import type Message from "../message";
+import type {Message} from '../message';
 import type {Hub} from '../hub';
 import type { Callback, ChannelRoute } from "../hub";
 
