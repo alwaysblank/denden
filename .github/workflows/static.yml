@@ -38,7 +38,7 @@ jobs:
         with:
           node-version: 22.14.0
       - name: Build Docs
-        run: npm run docs
+        run: npm ci && npm run docs
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
