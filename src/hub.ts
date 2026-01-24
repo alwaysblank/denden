@@ -7,6 +7,13 @@ export type Channel = Array<Message> & {name: string};
 
 export type CallbackResult = any|Promise<any>;
 
+/**
+ * A callback passed to {@link Hub.sub}.
+ *
+ * @param payload The payload of the message being processed.
+ * @param message The message being processed.
+ * @param unsub A function which, when called, will terminate the subscription.
+ */
 export type Callback<Payload> = (payload: Payload, message: Message<Payload>, unsub: (reason?: string) => void) => unknown;
 
 export type WatchProcessor<Payload> = (event: Event) => Payload;
@@ -50,11 +57,7 @@ export default class Hub extends EventTarget {
         const controller = new AbortController();
 		const listener = (msg: Event) => {
 			if (msg instanceof Message && match(channel, msg.channel)) {
-				 const result = callback(msg.payload, msg, (reason?: string) => controller.abort(reason));
-				 this.addToRunning(
-					 msg,
-					 'undefined' === typeof result ? true : result
-				 )
+				this.handleCallback<Payload>(callback, msg, controller);
 			}
 		}
 		this.addEventListener(Message.NAME, listener, {signal: controller.signal, ...listenerOptions});
@@ -257,5 +260,53 @@ export default class Hub extends EventTarget {
 		}
 		current.push(status);
 		this.running.set(msg.contains, current);
+	}
+
+	/**
+	 * Handle running the callback for {@link sub}.
+	 */
+	private handleCallback<Payload>(callback: Callback<Payload>, message: Message<Payload>, controller: AbortController) {
+		let result: CallbackResult;
+		try {
+			result = callback(message.payload, message, (reason?: string) => controller.abort(reason));
+		} catch (e) {
+			result = new CallbackError(e);
+			if (e instanceof Error) {
+				this.dispatchEvent(new ErrorEvent(result));
+			} else {
+				this.dispatchEvent(new ErrorEvent(new Error(
+					'Caught a non-Error error',
+					{cause: result}
+				)));
+			}
+		}
+		this.addToRunning(
+			message,
+			'undefined' === typeof result ? true : result
+		)
+	}
+}
+
+/**
+ * Wraps an error thrown by a callback passed to {@link Hub.sub} so that we can differentiate from an error that a callback returns.
+ */
+export class CallbackError extends Error {
+	static NAME = 'ddm::error::callback';
+	constructor(e: unknown) {
+		super(CallbackError.NAME, {cause: e});
+	}
+}
+
+/**
+ * Event dispatched when the {@link Hub} encounters an error so that we can react to errors without them blocking execution.
+ *
+ * Most notably, this is used when a callback passed to {@link Hub.sub} throws an error.
+ */
+export class ErrorEvent extends Event {
+	static NAME = 'ddm::event::error';
+	public readonly cause: Error;
+	constructor(error: Error) {
+		super(ErrorEvent.NAME);
+		this.cause = error;
 	}
 }
