@@ -1,5 +1,5 @@
 import {Message} from './message';
-import {match, sortByProp} from "./tools";
+import {match, OmitFirstArg, sortByProp, withHub} from './tools';
 
 export type ChannelRoute = string | RegExp;
 
@@ -53,12 +53,42 @@ export type MessageQuery = {
 	limit?: number;
 };
 
+export type Extension<F extends (hub: Hub, ...args: Parameters<OmitFirstArg<F>>) => ReturnType<F>> = [
+	name: string,
+	func: F,
+];
+
+export type HubConstructorInit = {
+	extensions?: Array<Extension<any>>;
+}
+
 /**
  * Hub for sending and registering to receive messages.
  */
 export class Hub extends EventTarget {
 	private channels: Map<string, Channel> = new Map();
 	private running: WeakMap<{payload: unknown}, Array<CallbackResult>> = new WeakMap();
+	private extensions: Map<string, (hub: Hub, ...args: unknown[]) => unknown> = new Map();
+
+	constructor(init: HubConstructorInit = {}) {
+		super();
+		const options = {
+			extensions: [],
+			...init,
+		}
+		options.extensions.forEach(([name, func]) => {
+			this.addExtension(name, func);
+		});
+		const self = this;
+		return new Proxy(this, {
+			get(hub, property, receiver) {
+				if ('string' === typeof property && self.extensions.has(property)) {
+					return self.extensions.get(property);
+				}
+				return Reflect.get(hub, property, receiver);
+			}
+		});
+	}
 
 	/**
 	 * Listen to messages sent to a particular channel.
@@ -316,6 +346,10 @@ export class Hub extends EventTarget {
 			message,
 			'undefined' === typeof result ? true : result
 		)
+	}
+
+	private addExtension(name: string, func: (hub: Hub, ...args: unknown[]) => unknown) {
+		this.extensions.set(name, withHub(this, func));
 	}
 }
 
