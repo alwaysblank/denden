@@ -1,6 +1,6 @@
 import {Hub} from './core';
 import {makeQueue, QueuedRecord} from './queue';
-import {once, only, until} from './extensions/helpers';
+import {once, only, until} from './extensions/conditionals';
 import {asPromise, getAffix, match, reverseString, sortByProp, withHub} from './tools';
 import {first, firstAsync, latest, latestAsync} from './extensions/waiter';
 import {watch} from './extensions/watch';

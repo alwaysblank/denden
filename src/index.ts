@@ -1,4 +1,4 @@
-import {once, only, until} from './extensions/helpers';
+import {once, only, until} from './extensions/conditionals';
 import {first, firstAsync, latest, latestAsync} from './extensions/waiter';
 import {watch} from './extensions/watch';
 import {
