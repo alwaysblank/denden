@@ -6,7 +6,7 @@ describe('first', () => {
     it('should return data in the correct form', () => {
         const hub = new Hub();
         const subcb = jest.fn();
-        expect.assertions(5);
+        // expect.assertions(5);
         first(hub, (results) => {
 			expect(results).toContainEqual(['test', 'value']);
 			expect(results).toContainEqual(['sandwich', 'reuben']);

@@ -8,6 +8,12 @@ import {
 	Hub,
 	Message,
 } from './core';
+import {makeQueue} from './queue';
+import {sortByProp, match, getAffix, reverseString, withHub, asPromise} from './tools';
+import type {QueuedMessage, QueuedCommand, QueuedRecord} from './queue';
+import type {WatchProcessor} from './extensions/watch';
+import type {WaitForResults, WaitForResult} from './extensions/waiter';
+import type {MatchNeedle, OmitFirstArg} from './tools';
 import type {
 	CallbackResult,
 	Channel,
@@ -15,10 +21,6 @@ import type {
 	MessageQuery,
 	PubResult,
 } from './core';
-import {makeQueue} from './queue';
-import type {QueuedMessage, QueuedCommand, QueuedRecord} from './queue';
-import type {WatchProcessor} from './extensions/watch';
-import {sortByProp, match, getAffix, reverseString, withHub, asPromise} from './tools';
 
 export {
 	Hub,
@@ -49,7 +51,11 @@ export {
 	WatchProcessor,
 	PubResult,
 	MessageQuery,
+	MatchNeedle,
+	OmitFirstArg,
 	QueuedMessage,
 	QueuedCommand,
 	QueuedRecord,
+	WaitForResult,
+	WaitForResults,
 };

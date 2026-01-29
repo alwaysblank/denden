@@ -66,65 +66,78 @@ describe('once', () => {
 describe('until', () => {
     it('should stop when until() condition is met', () => {
         const hub = new Hub();
-        const onUntil = jest.fn();
+        const afterUntil = jest.fn();
+		const onUntil = jest.fn();
         const every = jest.fn();
 
         const untilConditional = (payload: number) => {
             return payload > 1;
         }
 
-        expect(onUntil).toHaveBeenCalledTimes(0);
+        expect(afterUntil).toHaveBeenCalledTimes(0);
         expect(every).toHaveBeenCalledTimes(0);
 
-        until(hub, 'test', onUntil, untilConditional);
+        until(hub, 'test', afterUntil, untilConditional);
+		until(hub, 'test', onUntil, untilConditional, false);
         hub.sub('test', every);
 
-        expect(onUntil).toHaveBeenCalledTimes(0);
+        expect(afterUntil).toHaveBeenCalledTimes(0);
+		expect(onUntil).toHaveBeenCalledTimes(0);
         expect(every).toHaveBeenCalledTimes(0);
 
         hub.pub('test', 0);
-        expect(onUntil).toHaveBeenCalledTimes(1);
+        expect(afterUntil).toHaveBeenCalledTimes(1);
+		expect(onUntil).toHaveBeenCalledTimes(1);
         expect(every).toHaveBeenCalledTimes(1);
 
         hub.pub('test', 1);
-        expect(onUntil).toHaveBeenCalledTimes(2);
+        expect(afterUntil).toHaveBeenCalledTimes(2);
+		expect(onUntil).toHaveBeenCalledTimes(2);
         expect(every).toHaveBeenCalledTimes(2);
 
         hub.pub('test', 2);
-        expect(onUntil).toHaveBeenCalledTimes(2);
+        expect(afterUntil).toHaveBeenCalledTimes(3);
+		expect(onUntil).toHaveBeenCalledTimes(2);
         expect(every).toHaveBeenCalledTimes(3);
 
         hub.pub('test', 3);
-        expect(onUntil).toHaveBeenCalledTimes(2);
+        expect(afterUntil).toHaveBeenCalledTimes(3);
+		expect(onUntil).toHaveBeenCalledTimes(2);
         expect(every).toHaveBeenCalledTimes(4);
     });
 
     it('should stop when until() condition is met (high start)', () => {
         const hub = new Hub();
-        const onUntil = jest.fn();
+        const afterUntil = jest.fn();
+		const onUntil = jest.fn();
         const every = jest.fn();
 
         const untilConditional = (payload: number) => {
             return payload > 1;
         }
 
-        expect(onUntil).toHaveBeenCalledTimes(0);
+        expect(afterUntil).toHaveBeenCalledTimes(0);
+		expect(onUntil).toHaveBeenCalledTimes(0);
         expect(every).toHaveBeenCalledTimes(0);
 
-        until(hub, 'test', onUntil, untilConditional);
+        until(hub, 'test', afterUntil, untilConditional);
+		until(hub, 'test', onUntil, untilConditional, false);
         hub.sub('test', every);
 
-        expect(onUntil).toHaveBeenCalledTimes(0);
+        expect(afterUntil).toHaveBeenCalledTimes(0);
+		expect(onUntil).toHaveBeenCalledTimes(0);
         expect(every).toHaveBeenCalledTimes(0);
 
         hub.pub('test', 10);
 
-        expect(onUntil).toHaveBeenCalledTimes(0);
+        expect(afterUntil).toHaveBeenCalledTimes(1);
+		expect(onUntil).toHaveBeenCalledTimes(0);
         expect(every).toHaveBeenCalledTimes(1);
 
         hub.pub('test', 0);
 
-        expect(onUntil).toHaveBeenCalledTimes(0);
+        expect(afterUntil).toHaveBeenCalledTimes(1);
+		expect(onUntil).toHaveBeenCalledTimes(0);
         expect(every).toHaveBeenCalledTimes(2);
     });
 });

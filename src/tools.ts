@@ -1,7 +1,16 @@
 import type {Hub} from './core';
 
+/**
+ * Return a version of {@link F} which omits the first argument.
+ *
+ * @template F The function type to be modified. Must have at least one argument.
+ */
 export type OmitFirstArg<F> = F extends (x: any, ...args: infer P) => infer R ? (...args: P) => R : never;
 
+/**
+ * Acceptable needle types for {@link match}.
+ */
+export type MatchNeedle = string | RegExp | Array<string|RegExp>;
 
 /**
  * Sort an array of objects by one of their properties (must be numeric) in ascending or descending order.
@@ -25,8 +34,6 @@ export const sortByProp = <O>(arr: O[], prop: keyof O, order: 'ASC' | 'DESC') =>
             }
         });
 }
-
-export type MatchNeedle = string | RegExp | Array<string|RegExp>;
 
 /**
  * Test if `needle` can be matched against `haystack`.

@@ -1,9 +1,9 @@
-import {Hub} from '../core';
+import type {Hub} from '../core';
 
 /**
- * Callback to {@link Hub.watch} to convert an event to a payload suitable for dispatch to a channel.
+ * Callback to {@link watch} to convert an event to a payload suitable for dispatch to a channel.
  *
- * @template Payload The value returned by this method, and carried by the message that {@link Hub.watch} dispatched to the channel.
+ * @template Payload The value returned by this method, and carried by the message that {@link watch} dispatched to the channel.
  */
 export type WatchProcessor<Payload> = (event: Event) => Payload;
 
@@ -17,6 +17,15 @@ export type WatchProcessor<Payload> = (event: Event) => Payload;
  * @param [processor] Callback to convert events from {@link target} into the appropriate payload for {@link channel}. Defaults to simply returning the entire event object.
  *
  * @template Payload The type of the payload carried by the message(s) being published.
+ *
+ * @example
+ * const hub = new Hub();
+ *
+ * watch(hub, 'sandwiches', window, 'sandwich');
+ *
+ * hub.sub('sandwiches', (p) => console.log(`received: ${p}`));
+ * window.dispatchEvent(new CustomEvent('sandwich', {detail: 'reuben'}));
+ * // "received: reuben"
  */
 export function watch<Payload>(hub: Hub, channel: string, target: EventTarget, eventType: string, processor?: WatchProcessor<Payload>) {
 	if ('function' !== typeof processor) {

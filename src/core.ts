@@ -312,7 +312,7 @@ export class Message<Payload extends any = any> extends Event {
 	 * A value used to order messages.
 	 *
 	 * Strictly speaking, it is set on Message creation, not on Message
-	 * dispatch, but when using the methods {@link Hub.pub} or {@link Hub.watch}
+	 * dispatch, but when using the methods {@link Hub.pub}
 	 * Messages are created at the time of dispatch.
 	 */
 	public readonly order: number;

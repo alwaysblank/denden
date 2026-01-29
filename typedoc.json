@@ -1,12 +1,7 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
-    "src/hub.ts",
-    "src/message.ts",
-    "src/queue.ts",
-    "src/tools.ts",
-    "src/extensions/helpers.ts",
-    "src/extensions/waiter.ts"
+    "src/index.ts"
   ],
   "out": "./docs"
 }

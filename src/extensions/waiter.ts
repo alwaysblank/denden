@@ -61,12 +61,27 @@ const SUCCESS = {
  * @param callback If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
+ *
+ * @example
+ * const hub = new Hub();
+ *
+ * first(hub, r => console.log(`first: ${r}`), ['sandwich', 'soup'], 1000);
+ *
+ * hub.pub('sandwich', 'reuben');
+ * hub.pub('sandwich', 'club');
+ * hub.pub('soup', 'chicken');
+ *
+ * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, routes: ChannelRoute[], waitTime: number): void {
+function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, routes: ChannelRoute|ChannelRoute[], waitTime: number): void {
+	if (!Array.isArray(routes)) {
+		routes = [routes];
+	}
     Promise.allSettled(routes.map(route => {
         return new Promise((resolve: (value: [r: ChannelRoute, v: T]) => void, reject) => {
             const unsub = hub.sub<T>(route, (payload) => {
                 resolve([route, payload]);
+				unsub();
             }, 1);
             if(waitTime > -1) {
                 setTimeout(() => {
@@ -98,8 +113,20 @@ function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, rout
  * @param hub The {@link Hub} instance to which this will subscribe.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
+ *
+ * @example
+ * const hub = new Hub();
+ *
+ * firstAsync(hub, ['sandwich', 'soup'], 1000)
+ * 	.then(r => console.log(`first: ${r}`));
+ *
+ * hub.pub('sandwich', 'reuben');
+ * hub.pub('sandwich', 'club');
+ * hub.pub('soup', 'chicken');
+ *
+ * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Promise<WaitForResults<T>> {
+function firstAsync<T>(hub: Hub, routes: ChannelRoute|ChannelRoute[], waitTime: number): Promise<WaitForResults<T>> {
 	const firstWithHub = withHub(hub, first<T>);
 	return asPromise<WaitForResults<T>, typeof firstWithHub>(firstWithHub)(routes, waitTime);
 }
@@ -108,7 +135,7 @@ function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Prom
  * Wait for all specified {@link routes} to receive at least one message, and return a set of the most recent.
  *
  * This function is essentially identical in behavior to {@link first} except that it will return the *last* messages
- * sent to every route, instead of the first. The usual use case here would be if you are listening to more than one
+ * sent to every route, instead of the first. The usual use case here would be if you were listening to more than one
  * route and expect one (or more) of those routes to send several messages before all have completed.
  *
  * @see first
@@ -118,9 +145,21 @@ function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Prom
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
  *
- * @return Promise if `callback` is passed; void otherwise.
+ * @example
+ * const hub = new Hub();
+ *
+ * last(hub, r => console.log(`last: ${r}`), ['sandwich', 'soup'], 1000);
+ *
+ * hub.pub('sandwich', 'reuben');
+ * hub.pub('sandwich', 'club');
+ * hub.pub('soup', 'chicken');
+ *
+ * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), routes: ChannelRoute[], waitTime: number): void {
+function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), routes: ChannelRoute|ChannelRoute[], waitTime: number): void {
+	if (!Array.isArray(routes)) {
+		routes = [routes];
+	}
     const waiter = new Promise((resolve: (results: WaitForResults<T>) => void, reject) => {
        const controller = new AbortController();
        const collector = new Map<ChannelRoute, T>();
@@ -167,8 +206,20 @@ function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), r
  * @param hub The {@link Hub} instance to which this will subscribe.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
+ *
+ * @example
+ * const hub = new Hub();
+ *
+ * lastAsync(hub, ['sandwich', 'soup'], 1000)
+ * 	.then(r => console.log(`last: ${r}`));
+ *
+ * hub.pub('sandwich', 'reuben');
+ * hub.pub('sandwich', 'club');
+ * hub.pub('soup', 'chicken');
+ *
+ * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latestAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Promise<WaitForResults<any>> {
+function latestAsync<T>(hub: Hub, routes: ChannelRoute|ChannelRoute[], waitTime: number): Promise<WaitForResults<any>> {
 	const latestWithHub = withHub(hub, latest<T>);
 	return asPromise<WaitForResults<any>, typeof latestWithHub>(latestWithHub)(routes, waitTime);
 }
