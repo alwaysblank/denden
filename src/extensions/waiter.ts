@@ -73,10 +73,7 @@ const SUCCESS = {
  *
  * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, routes: ChannelRoute|ChannelRoute[], waitTime: number): void {
-	if (!Array.isArray(routes)) {
-		routes = [routes];
-	}
+function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, routes: ChannelRoute[], waitTime: number): void {
     Promise.allSettled(routes.map(route => {
         return new Promise((resolve: (value: [r: ChannelRoute, v: T]) => void, reject) => {
             const unsub = hub.sub<T>(route, (payload) => {
@@ -126,7 +123,7 @@ function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, rout
  *
  * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function firstAsync<T>(hub: Hub, routes: ChannelRoute|ChannelRoute[], waitTime: number): Promise<WaitForResults<T>> {
+function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Promise<WaitForResults<T>> {
 	const firstWithHub = withHub(hub, first<T>);
 	return asPromise<WaitForResults<T>, typeof firstWithHub>(firstWithHub)(routes, waitTime);
 }
@@ -156,10 +153,7 @@ function firstAsync<T>(hub: Hub, routes: ChannelRoute|ChannelRoute[], waitTime: 
  *
  * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), routes: ChannelRoute|ChannelRoute[], waitTime: number): void {
-	if (!Array.isArray(routes)) {
-		routes = [routes];
-	}
+function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), routes: ChannelRoute[], waitTime: number): void {
     const waiter = new Promise((resolve: (results: WaitForResults<T>) => void, reject) => {
        const controller = new AbortController();
        const collector = new Map<ChannelRoute, T>();
@@ -219,7 +213,7 @@ function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), r
  *
  * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latestAsync<T>(hub: Hub, routes: ChannelRoute|ChannelRoute[], waitTime: number): Promise<WaitForResults<any>> {
+function latestAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Promise<WaitForResults<any>> {
 	const latestWithHub = withHub(hub, latest<T>);
 	return asPromise<WaitForResults<any>, typeof latestWithHub>(latestWithHub)(routes, waitTime);
 }
