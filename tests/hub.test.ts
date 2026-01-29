@@ -446,6 +446,15 @@ describe('Channel management', () => {
 		// @ts-expect-error -- We want to test a bad event type.
 		expect(() => channel.push(new Event('not a message'))).toThrowError(new Error('Channels can only contain Messages.'));
 	});
+
+	it('should error on wildcard channel creation', () => {
+		expect.assertions(4);
+		const hub = new Hub();
+		expect(() => hub.makeChannel('*')).toThrowError(new Error('Channel names cannot contain wildcards.'));
+		expect(() => hub.makeChannel('sand*')).toThrowError(new Error('Channel names cannot contain wildcards.'));
+		expect(() => hub.makeChannel('*wich')).toThrowError(new Error('Channel names cannot contain wildcards.'));
+		expect(() => hub.makeChannel('sa*ch')).toThrowError(new Error('Channel names cannot contain wildcards.'));
+	})
 })
 
 describe('Message', () => {

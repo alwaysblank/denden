@@ -231,6 +231,9 @@ export class Hub extends EventTarget {
 	 * Return the channel on this hub called {@link name}, or create one and return it if none exists.
 	 */
 	private channel<Payload>(name: string) {
+		if(name.includes('*')) {
+			throw new TypeError('Channel names cannot contain wildcards.');
+		}
 		const existing = this.channels.get(name);
 		if (existing) {
 			return existing;
