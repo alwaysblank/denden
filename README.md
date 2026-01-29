@@ -205,3 +205,77 @@ hub.pub('sandwich', 'club');
 ```
 
 For more usage details, see the [documentation](https://alwaysblank.github.io/denden/).
+
+## Channels
+
+A "channel" is where messages are dispatched to, and the mechanism by which subscribers indicate which messages they wish to receive.
+Channels are identified by string keys, which can be any string but cannot contain a wildcard symbol (`*`).
+A channel is created automatically when a message is published to it, unless a message is published to a route with cannot be conclusively resolved to a set of existing channels.
+
+Channels can also be manually created with `Hub.createChannel(name)`.
+
+### Routes
+
+A channel "route" can describe a literal channel name (`sandwich`), a wildcard (`sand*` or `*wich`), or as regular expression (`/^sa.*ch$/`).
+
+Routes can be used in both `Hub.sub()` and `Hub.pub()`, but the behavior is slightly different:
+
+#### `sub()`
+
+A subscriber will receive messages published to any channel that matches the route.
+
+#### `pub()`
+
+The usual behavior for publishing is to describe one or more channels by their definitive names.
+Channels are created if they don't exist before message(s) are published to them.
+
+However, `pub()` will also allow publishing to non-definitive routes (i.e. wildcard or regex routes).
+It will resolve these against any *existing* channels but will not create new channels for non-definitive routes, because it can't infer definitive names from a regex or wildcard. 
+This means that it is not possible to "prepopulate" a channel search with messages for future subscribers.
+
+Example:
+```ts
+hub.createChannel('sandwich');
+hub.pub('sand*', 'reuben');
+
+hub.sub('sandwich', (p) => console.log(`sandwich: ${p}`), 1);
+// "sandwich: reuben"
+hub.sub('sandpiper', (p) => console.log(`sandpiper: ${p}`), 1);
+// No messages received.
+
+hub.pub('sand*', 'club');
+// "sandwich: club"
+// "sandpiper: club"
+```
+
+## Modules
+
+The core module (`src/core.ts`) provides the most basic functionaltiy: A hub that can dispatch messages to subscribers and subscribe to channels.
+This may provide all you need!
+But the package also includes some other functionality in "extensions" to handle specific tasks that may save you some time.
+
+> All extensions use the public API for the `Hub` and `Message` classes.
+> In other words, you could build them yourself if you wanted to—they're only here to save you some time.
+
+### Conditionals
+
+A set of small tools to help with `Hub.sub()` for conditional subscriptions.
+
+- [`once`](https://alwaysblank.github.io/denden/functions/once) - Remove the subscription after the first message is received.
+- [`only`](https://alwaysblank.github.io/denden/functions/only) - Only messages in the channel which match a test will be sent to the callback.
+- [`until`](https://alwaysblank.github.io/denden/functions/until) - Remove the subscription after a given condition is met. This is dependent on the order in which messages are received.
+
+### Waiter
+
+Tools for handling cases where you wish to collect responses from a set of different channels, potentially over time.
+
+> These functions accept channel routes as arguments, so be sure to read the section on [Routes](#routes) above.
+
+- [`first`](https://alwaysblank.github.io/denden/functions/first) - Returns an array containing the first message sent to each channel (route). Includes a timeout value, which will cause it to return early if no messages are received.
+  - [`firstAsync`](https://alwaysblank.github.io/denden/functions/firstAsync) - The same behavior as `first`, except it returns a Promise instead of taking a callback.
+- [`latest`](https://alwaysblank.github.io/denden/functions/latest) - Returns an array containing the most recent message sent to each channel (route). Includes a timeout value, which will cause it to return early if no messages are received.
+  - [`latestAsync`](https://alwaysblank.github.io/denden/functions/latestAsync) - The same behavior as `latest`, except it returns a Promise instead of taking a callback.
+
+### Watch
+
+- [`watch`](https://alwaysblank.github.io/denden/functions/watch) - Watches an `EventEmitter` for events of the specified type, then dispatches them to the hub on the specified channel(s). See the rules above for using routes on `pub()`, which also apply here
