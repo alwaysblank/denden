@@ -1,5 +1,4 @@
-import {CallbackError, ErrorEvent, Hub} from '../src/hub';
-import {Message} from '../src/message';
+import {CallbackError, ErrorEvent, Hub, Message} from '../src';
 import {describe, expect} from '@jest/globals';
 import "../definitions/toHaveChannel.d.ts"
 
@@ -375,36 +374,6 @@ describe('Subscribing & Publishing', () => {
 	});
 });
 
-describe('Other message sources', () => {
-    it('should ingest messages from processing other events', () => {
-        const emitter = new EventTarget();
-        const hub = new Hub();
-        const callback = jest.fn();
-        const unwatch = hub.watch('emitter', emitter, 'test', e => e.type);
-        hub.sub('emitter', callback);
-        emitter.dispatchEvent(new Event('test'));
-        expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('test', expect.toHaveChannel('emitter'), expect.any(Function));
-        expect(hub.getMessages({cid:'emitter', limit: Infinity})).toHaveLength(1);
-        unwatch();
-        emitter.dispatchEvent(new Event('test'));
-        expect(callback).toHaveBeenCalledTimes(1);
-        expect(hub.getMessages({cid:'emitter', limit: Infinity})).toHaveLength(1);
-    });
-
-	it('should pass alongf the entire event if no callback is provided', () => {
-		const emitter = new EventTarget();
-		const hub = new Hub();
-		const cb = jest.fn();
-		hub.watch('emitter', emitter, 'test');
-		hub.sub('emitter', cb);
-		const event = new Event('test');
-		emitter.dispatchEvent(event);
-		expect(cb).toHaveBeenCalledTimes(1);
-		expect(cb).toHaveBeenCalledWith(event, expect.toHaveChannel('emitter'), expect.any(Function));
-	});
-});
-
 describe('Retrieving messages directly', () => {
     it('should retrieve messages that match a query', () => {
         const hub = new Hub();
@@ -478,3 +447,23 @@ describe('Channel management', () => {
 		expect(() => channel.push(new Event('not a message'))).toThrowError(new Error('Channels can only contain Messages.'));
 	});
 })
+
+describe('Message', () => {
+	it('should return a message', () => {
+		const message = Message.create('test', 'message payload');
+		expect(message.payload).toEqual('message payload');
+		expect(message.channel).toBe('test'); // This should be a reference to the channel, not just something that looks like it.
+		expect(typeof message.order).toEqual('number');
+	});
+
+	it('should return properly formed JSON', () => {
+		const message = Message.create('test', 'message payload');
+		const JSONObject = message.toJSON();
+		expect(JSONObject.payload).toEqual('message payload');
+		expect(JSONObject.channel).toEqual('test');
+		expect(typeof JSONObject.order).toEqual('number');
+
+		const str = JSON.stringify(message);
+		expect(JSON.parse(str)).toEqual(JSONObject);
+	})
+});

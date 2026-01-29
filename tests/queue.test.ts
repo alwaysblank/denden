@@ -1,10 +1,9 @@
-import {Hub} from '../src/hub';
-import {makeQueue} from '../src/queue';
+import {makeQueue, Hub} from '../src';
 import {describe, expect} from '@jest/globals';
-jest.mock("../src/hub", () => {
+jest.mock("../src/", () => {
 	return {
 		__esModule: true,
-		...jest.requireActual("../src/hub"),
+		...jest.requireActual("../src"),
 		Hub: jest.fn().mockImplementation(() => ({
 			sub: jest.fn(),
 			pub: jest.fn(),

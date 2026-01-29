@@ -1,22 +1,23 @@
-import {once, only, until } from './extensions/helpers';
-import { first, firstAsync, latest, latestAsync } from './extensions/waiter';
+import {once, only, until} from './extensions/helpers';
+import {first, firstAsync, latest, latestAsync} from './extensions/waiter';
+import {watch} from './extensions/watch';
 import {
 	Callback,
+	ErrorEvent,
 	CallbackError,
 	Hub,
-} from './hub';
+	Message,
+} from './core';
 import type {
 	CallbackResult,
-	ErrorEvent,
 	Channel,
 	ChannelRoute,
 	MessageQuery,
 	PubResult,
-	WatchProcessor,
-} from './hub';
-import {Message} from './message';
+} from './core';
 import {makeQueue} from './queue';
 import type {QueuedMessage, QueuedCommand, QueuedRecord} from './queue';
+import type {WatchProcessor} from './extensions/watch';
 import {sortByProp, match, getAffix, reverseString, withHub, asPromise} from './tools';
 
 export {
@@ -35,6 +36,7 @@ export {
 	until,
 	once,
 	only,
+	watch,
 	first,
 	firstAsync,
 	latest,

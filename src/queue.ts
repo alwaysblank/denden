@@ -1,4 +1,4 @@
-import { Hub } from './hub';
+import type {Hub} from './core';
 
 /**
  * Record which will be broadcast on the channel specified by the first element.

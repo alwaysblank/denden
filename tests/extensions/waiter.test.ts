@@ -1,4 +1,4 @@
-import {Hub} from '../../src/hub';
+import {Hub} from '../../src';
 import {ERRORS, first, firstAsync, latest, latestAsync} from '../../src/extensions/waiter';
 jest.useFakeTimers();
 

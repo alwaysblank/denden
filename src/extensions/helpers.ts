@@ -1,6 +1,5 @@
-import type {Message} from '../message';
-import type {Hub} from '../hub';
-import type { Callback, ChannelRoute } from "../hub";
+import {Hub, Message} from '../core';
+import type {Callback, ChannelRoute} from "../core";
 
 /**
  * Run callback only if `test` evaluates to `true`.

@@ -1,5 +1,4 @@
-import type { Hub } from "../hub";
-import type { ChannelRoute } from "../hub";
+import type {Hub, ChannelRoute} from "../core";
 import {asPromise, withHub} from '../tools';
 
 /**

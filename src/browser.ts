@@ -1,8 +1,9 @@
-import {Hub} from './hub';
+import {Hub} from './core';
 import {makeQueue, QueuedRecord} from './queue';
 import {once, only, until} from './extensions/helpers';
 import {asPromise, getAffix, match, reverseString, sortByProp, withHub} from './tools';
 import {first, firstAsync, latest, latestAsync} from './extensions/waiter';
+import {watch} from './extensions/watch';
 
 type BrowserHub = Hub & {
 	extensions: typeof extensions,
@@ -34,6 +35,7 @@ const extensions = {
 	once: tools.withHub(once),
 	until: tools.withHub(until),
 	only: tools.withHub(only),
+	watch: tools.withHub(watch),
 	first: tools.withHub(first),
 	firstAsync: tools.withHub(firstAsync),
 	latest: tools.withHub(latest),

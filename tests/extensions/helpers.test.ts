@@ -1,6 +1,6 @@
-import {Hub} from '../../src/hub';
+import {Hub} from '../../src';
 import {expect} from "@jest/globals";
-import {once, only, until} from "../../src/extensions/helpers";
+import {once, only, until} from '../../src';
 import "../../definitions/toHaveChannel.d.ts"
 
 

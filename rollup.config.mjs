@@ -4,7 +4,7 @@ import pkg from "./package.json" with { type: "json" };
 
 export default [
     {
-        input: 'src/main.ts',
+        input: 'src/index.ts',
         output: {
             file: pkg.module,
             format: 'module'

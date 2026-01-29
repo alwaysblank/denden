@@ -1,5 +1,4 @@
-import {Message} from './message';
-import {match, sortByProp} from "./tools";
+import {match, sortByProp} from './tools';
 
 export type ChannelRoute = string | RegExp;
 
@@ -28,13 +27,6 @@ export type CallbackResult = any|Promise<any>;
  * @template Payload The type of the value carried by message.
  */
 export type Callback<Payload> = (payload: Payload, message: Message<Payload>, unsub: (reason?: string) => void) => unknown;
-
-/**
- * Callback to {@link Hub.watch} to convert an event to a payload suitable for dispatch to a channel.
- *
- * @template Payload The value returned by this method, and carried by the message that {@link Hub.watch} dispatched to the channel.
- */
-export type WatchProcessor<Payload> = (event: Event) => Payload;
 
 /**
  * The value returns by the {@link Hub.pub} Promise.
@@ -161,28 +153,6 @@ export class Hub extends EventTarget {
 					this.running.delete(contains)
 				});
 		});
-	}
-
-	/**
-     * Watch an event emitter and retransmit events to a channel.
-     *
-     * @param channel The name of the channel to dispatch to. Will be created if it doesn't exit.
-     * @param target EventTarget to watch for events of {@link eventType}.
-     * @param eventType Type of event to watch for on {@link target}.
-     * @param [processor] Callback to convert events from {@link target} into the appropriate payload for {@link channel}. Defaults to simply returning the entire event object.
-	 *
-	 * @template Payload The type of the payload carried by the message(s) being published.
-     */
-	watch<Payload>(channel: string, target: EventTarget, eventType: string, processor?: WatchProcessor<Payload>) {
-		if ('function' !== typeof processor) {
-			// Default to just passing along the event as-is.
-			processor = (event) => event as Payload;
-		}
-		const listener = (e: Event) => {
-			this.pub<Payload>(channel, processor(e));
-		};
-		target.addEventListener(eventType, listener);
-		return () => target.removeEventListener(eventType, listener);
 	}
 
 	/**
@@ -328,6 +298,94 @@ export class Hub extends EventTarget {
 		)
 	}
 }
+
+/**
+ * An Event carrying some kind of data.
+ *
+ * @template Payload Type of data carried by this message.
+ */
+export class Message<Payload extends any = any> extends Event {
+	static NAME = 'ddm::event::message';
+	static #order: number = 0;
+
+	/**
+	 * A value used to order messages.
+	 *
+	 * Strictly speaking, it is set on Message creation, not on Message
+	 * dispatch, but when using the methods {@link Hub.pub} or {@link Hub.watch}
+	 * Messages are created at the time of dispatch.
+	 */
+	public readonly order: number;
+
+	/**
+	 * An object containing the payload.
+	 *
+	 * Generally you don't want to access this; you want to access {@link payload}.
+	 * This is an object because we want to be able to use it as a unique
+	 * identifier for Messages. Different messages would have the same scalar
+	 * payload but be meaningfully distinct. Object equality in JS, however,
+	 * means that ever object can be distinct, even if the actual payloads are
+	 * the same.
+	 */
+	public readonly contains: { payload: Payload };
+
+	/**
+	 * The channel on which this Message was originally dispatched.
+	 *
+	 * This can be relevant because in some situations (i.e. when calling
+	 * {@link Hub.getMessages Hub.getMessages()} or {@link Hub.sub}) Messages can be returned from
+	 * across several channels.
+	 */
+	public readonly channel: string;
+
+	/**
+	 * If manually creating a message outside of a Hub, using {@link Message.create} is easier to use.
+	 *
+	 * The constructor allows you to directly specify the {@link Message.contains}
+	 * object, which may be useful if creating multiple Messages across different
+	 * channels with the same payload.
+	 *
+	 * @param channel Name of the channel on which this message is *originally* to be dispatched.
+	 * @param payload Object containing the payload.
+	 */
+	constructor(channel: string, payload: { payload: Payload }) {
+		super(Message.NAME, {bubbles: false});
+		this.order = Message.#order++;
+		this.channel = channel;
+		this.contains = payload;
+	}
+
+	/**
+	 * The data being carried by this message.
+	 */
+	get payload(): Payload {
+		return this.contains.payload;
+	}
+
+	/**
+	 * Create a new Message.
+	 *
+	 * @param channel The  on which this message is *originally* to be dispatched.
+	 * @param payload The data being carried by this message.
+	 *
+	 * @template Payload Type of data carried by this message.
+	 */
+	static create<Payload extends any>(channel: string, payload: Payload): Message<Payload> {
+		return new Message(channel, {payload});
+	}
+
+	/**
+	 * Specify how this class should be converted to a JSON object.
+	 */
+	toJSON() {
+		return {
+			channel: this.channel,
+			payload: this.payload,
+			order: this.order,
+		}
+	}
+}
+
 
 /**
  * Wraps an error thrown by a callback passed to {@link Hub.sub} so that we can differentiate from an error that a callback returns.

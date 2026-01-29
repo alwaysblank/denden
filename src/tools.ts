@@ -1,4 +1,4 @@
-import type {Hub} from './hub';
+import type {Hub} from './core';
 
 export type OmitFirstArg<F> = F extends (x: any, ...args: infer P) => infer R ? (...args: P) => R : never;
 
