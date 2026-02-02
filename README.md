@@ -223,18 +223,18 @@ Routes can be used in both `Hub.sub()` and `Hub.pub()`, but the behavior is slig
 When `sub()` is invoked, it takes a route, or array of routes, as its first argument.
 Any messages sent to a channel which matches any of the specified routes will be dispatched to the callback.
 
-Routes can be either definitely named channels (i.e. `sandwich`), wildcard routes (e.g. `sand*` or `*wich`), regular expression routes (e.g. `/^sa.*ch$/`), or a mix of all three.
+Routes can be either definitively named channels (i.e. `sandwich`), wildcard routes (e.g. `sand*` or `*wich`), regular expression routes (e.g. `/^sa.*ch$/`), or a mix of all three.
 
 #### `pub()`
 
 When `pub()` is invoked, it takes a route, or array of routes, as its first argument and a payload as its second argument.
 The payload will be dispatched to all channels that match the specified routes.
 
-Routes can be either definitely named channels (i.e. `sandwich`), wildcard routes (e.g. `sand*` or `*wich`), regular expression routes (e.g. `/^sa.*ch$/`), or a mix of all three.
+Routes can be either definitively named channels (i.e. `sandwich`), wildcard routes (e.g. `sand*` or `*wich`), regular expression routes (e.g. `/^sa.*ch$/`), or a mix of all three.
 
 Definitively named channels will be created if they do not already exist.
-Non-definitive routes (i.e., wildcard or regex routes) will be resolved against any existing channels but will not be created if they don't exist (since there is not enough information to infer definitive names from them).
-This means that it is not possible to "prepopulate" a channel search with messages for future subscribers.
+Non-definitive routes (i.e., wildcard or regex routes) will be resolved against any existing channels but _will not be created if they don't exist_ (since there is not enough information to infer definitive names from them).
+This means that it is _not_ possible to "prepopulate" a channel search with messages for future subscribers.
 
 Example:
 ```ts
@@ -255,7 +255,8 @@ Channels can also be manually created with `Hub.createChannel(name)`.
 
 ## Modules
 
-The core module (`src/core.ts`) provides the most basic functionaltiy: A hub that can dispatch messages to subscribers and subscribe to channels.
+The core module (`src/core.ts`) provides the most basic functionaltiy: 
+A hub that can dispatch messages to subscribers and subscribe to channels.
 This may provide all you need!
 But the package also includes some other functionality in "extensions" to handle specific tasks that may save you some time.
 
