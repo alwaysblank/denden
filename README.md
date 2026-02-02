@@ -209,10 +209,8 @@ For more usage details, see the [documentation](https://alwaysblank.github.io/de
 ## Channels
 
 A "channel" is where messages are dispatched to, and the mechanism by which subscribers indicate which messages they wish to receive.
-Channels are identified by string keys, which can be any string but cannot contain a wildcard symbol (`*`).
-A channel is created automatically when a message is published to it, unless a message is published to a route with cannot be conclusively resolved to a set of existing channels.
-
-Channels can also be manually created with `Hub.createChannel(name)`.
+Each channel has a single name, in the form of a string key.
+The key can be any string, but cannot contain a wildcard symbol (`*`).
 
 ### Routes
 
@@ -222,15 +220,20 @@ Routes can be used in both `Hub.sub()` and `Hub.pub()`, but the behavior is slig
 
 #### `sub()`
 
-A subscriber will receive messages published to any channel that matches the route.
+When `sub()` is invoked, it takes a route, or array of routes, as its first argument.
+Any messages sent to a channel which matches any of the specified routes will be dispatched to the callback.
+
+Routes can be either definitely named channels (i.e. `sandwich`), wildcard routes (e.g. `sand*` or `*wich`), regular expression routes (e.g. `/^sa.*ch$/`), or a mix of all three.
 
 #### `pub()`
 
-The usual behavior for publishing is to describe one or more channels by their definitive names.
-Channels are created if they don't exist before message(s) are published to them.
+When `pub()` is invoked, it takes a route, or array of routes, as its first argument and a payload as its second argument.
+The payload will be dispatched to all channels that match the specified routes.
 
-However, `pub()` will also allow publishing to non-definitive routes (i.e. wildcard or regex routes).
-It will resolve these against any *existing* channels but will not create new channels for non-definitive routes, because it can't infer definitive names from a regex or wildcard. 
+Routes can be either definitely named channels (i.e. `sandwich`), wildcard routes (e.g. `sand*` or `*wich`), regular expression routes (e.g. `/^sa.*ch$/`), or a mix of all three.
+
+Definitively named channels will be created if they do not already exist.
+Non-definitive routes (i.e., wildcard or regex routes) will be resolved against any existing channels but will not be created if they don't exist (since there is not enough information to infer definitive names from them).
 This means that it is not possible to "prepopulate" a channel search with messages for future subscribers.
 
 Example:
@@ -247,6 +250,8 @@ hub.pub('sand*', 'club');
 // "sandwich: club"
 // "sandpiper: club"
 ```
+
+Channels can also be manually created with `Hub.createChannel(name)`.
 
 ## Modules
 
