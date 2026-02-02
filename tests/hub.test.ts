@@ -99,6 +99,78 @@ describe('Subscribing & Publishing', () => {
         expect(callback).toHaveBeenCalledTimes(0);
     });
 
+	it('should allow only valid messages to be sent to a subscriber callback', () => {
+		const hub = new Hub();
+		const callback = jest.fn();
+		hub.sub('test', callback)
+
+		// This seems to have the right name, but it's just an Event.
+		hub.dispatchEvent(new Event('test'));
+		expect(callback).toHaveBeenCalledTimes(0);
+
+		// This is a properly published message, but it's to the wrong channel.
+		hub.pub('sausage', 'sandwich');
+		expect(callback).toHaveBeenCalledTimes(0);
+
+		// This is an event with the same (static) name property as Message, but it's not a Message.
+		const evt = new Event(Message.NAME);
+		hub.dispatchEvent(evt);
+		expect(callback).toHaveBeenCalledTimes(0);
+
+		hub.makeChannel('test');
+
+		const msg = Message.create('test', 'valid message');
+
+		// We finally send a valid message!
+		hub.dispatchEvent(msg);
+		expect(callback).toHaveBeenCalledTimes(1);
+		expect(callback).toHaveBeenCalledWith('valid message', expect.toHaveChannel('test'), expect.any(Function));
+	});
+
+	describe('routing', () => {
+		it.each([
+			[['sandwich'], [['reuben']]],
+			[['starship'], [['cerritos']]],
+			[['starship', 'sandwich'], [['cerritos'], ['reuben']]],
+			[['s*'], [['reuben', 'cerritos']]],
+			[['*'], [['reuben', 'cerritos', 'earth']]],
+			[[/^s.*i.*/], [['reuben', 'cerritos']]],
+			[['*i*'], [[]]], // This kind of match is not supported; use RegEx instead.
+			[[/i/], [['reuben', 'cerritos']]],
+			[[/.*/], [['reuben', 'cerritos', 'earth']]],
+			[[/^s/], [['reuben', 'cerritos']]],
+			[[/s$/], [['earth']]],
+			[['starship', 'salad'], [['cerritos'], []]],
+		])('route %p', (channel, expected) => {
+			const assertions = channel.reduce((acc, __, i) => {
+				let lng = expected[i].length;
+				if ( 0 === lng ) {
+					lng = 1; // If we expect no results, then we will be expecting the callback not to have been called--so at least one assertion.
+				}
+				return acc + lng;
+			}, 0);
+			expect.assertions(assertions);
+			const hub = new Hub();
+			const subs = channel.map(c => {
+				const cb = jest.fn();
+				hub.sub(c, cb);
+				return cb;
+			});
+			hub.pub('sandwich', 'reuben');
+			hub.pub('starship', 'cerritos');
+			hub.pub('elements', 'earth');
+			subs.forEach((cb, i) => {
+				if (expected[i].length === 0) {
+					expect(cb).not.toHaveBeenCalled();
+				} else {
+					expected[i].forEach(e => {
+						expect(cb).toHaveBeenCalledWith(e, expect.any(Object), expect.any(Function));
+					});
+				}
+			});
+		});
+	});
+
 	describe('unsubscribing', () => {
 		it('should prevent further callback invocations', () => {
 			const hub = new Hub();
@@ -153,35 +225,6 @@ describe('Subscribing & Publishing', () => {
 			expect(all).toHaveBeenCalledWith('sandwich', expect.toHaveChannel('test'), expect.any(Function));
 		});
 	});
-
-    it('should allow only valid messages to be sent to a subscriber callback', () => {
-        const hub = new Hub();
-        const callback = jest.fn();
-        hub.sub('test', callback)
-
-        // This seems to have the right name, but it's just an Event.
-        hub.dispatchEvent(new Event('test'));
-        expect(callback).toHaveBeenCalledTimes(0);
-
-        // This is a properly published message, but it's to the wrong channel.
-        hub.pub('sausage', 'sandwich');
-        expect(callback).toHaveBeenCalledTimes(0);
-
-        // This is an event with the same (static) name property as Message, but it's not a Message.
-        const evt = new Event(Message.NAME);
-        hub.dispatchEvent(evt);
-        expect(callback).toHaveBeenCalledTimes(0);
-
-		hub.makeChannel('test');
-
-        const msg = Message.create('test', 'valid message');
-
-        // We finally send a valid message!
-        hub.dispatchEvent(msg);
-        expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledWith('valid message', expect.toHaveChannel('test'), expect.any(Function));
-    });
-
 	describe('multi-channel publishing', () => {
 		it('should publish messages to multiple channels at once', () => {
 			const hub = new Hub();
