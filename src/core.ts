@@ -78,8 +78,11 @@ export class Hub extends EventTarget {
 	 *
 	 * @template Payload Value carried by the message.
 	 */
-	sub<Payload extends any = any>(channel: ChannelRoute, callback: Callback<Payload>, backlog: number = 0, listenerOptions: AddEventListenerOptions = {} ) {
+	sub<Payload extends any = any>(channel: ChannelRoute|ChannelRoute[], callback: Callback<Payload>, backlog: number = 0, listenerOptions: AddEventListenerOptions = {} ) {
         const controller = new AbortController();
+		if (!Array.isArray(channel)) {
+			channel = [channel];
+		}
 		const listener = (msg: Event) => {
 			if (msg instanceof Message && match(channel, msg.channel)) {
 				this.handleCallback<Payload>(callback, msg, controller);
