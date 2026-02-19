@@ -1,4 +1,6 @@
 # Den-Den 🐌
+[![Tests](https://github.com/alwaysblank/denden/actions/workflows/ci.yml/badge.svg)](https://github.com/alwaysblank/denden/actions/workflows/ci.yml)
+
 Extremely simple publish/subscribe system built on events.
 
 Designed for the browser, but should work in an JS context that supports events.
