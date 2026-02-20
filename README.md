@@ -221,6 +221,7 @@ A channel "route" can describe a literal channel name (`sandwich`), a wildcard (
 Routes can be used in both `Hub.sub()` and `Hub.pub()`, but the behavior is slightly different:
 
 #### `sub()`
+[Documentation](https://alwaysblank.github.io/denden/classes/Hub.html#sub)
 
 When `sub()` is invoked, it takes a route, or array of routes, as its first argument.
 Any messages sent to a channel which matches any of the specified routes will be dispatched to the callback.
@@ -228,6 +229,7 @@ Any messages sent to a channel which matches any of the specified routes will be
 Routes can be either definitively named channels (i.e. `sandwich`), wildcard routes (e.g. `sand*` or `*wich`), regular expression routes (e.g. `/^sa.*ch$/`), or a mix of all three.
 
 #### `pub()`
+[Documentation](https://alwaysblank.github.io/denden/classes/Hub.html#pub)
 
 When `pub()` is invoked, it takes a route, or array of routes, as its first argument and a payload as its second argument.
 The payload will be dispatched to all channels that match the specified routes.
