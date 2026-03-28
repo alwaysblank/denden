@@ -1,6 +1,7 @@
 import {CallbackError, ErrorEvent, Hub, Message} from '../src';
 import {describe, expect} from '@jest/globals';
 import "../definitions/toHaveChannel.d.ts"
+import {Metadata} from "../src/core";
 
 afterEach(() => {
     jest.restoreAllMocks();
@@ -519,3 +520,39 @@ describe('Message', () => {
 		expect(JSON.parse(str)).toEqual(JSONObject);
 	})
 });
+
+describe('Metadata', () => {
+	it('should insert records', () => {
+		expect.assertions(5);
+
+		const meta = new Metadata();
+		expect(meta.keys().size).toEqual(0);
+
+		meta.put('sandwich', 'reuben');
+		expect(meta.keys().size).toEqual(1);
+
+		expect(meta.get('sandwich')).toEqual(['reuben']);
+
+		meta.put('sandwich', 'ham', 'croque monseigneur');
+		expect(meta.keys().size).toEqual(1);
+		expect(meta.get('sandwich')).toEqual(['reuben', 'ham', 'croque monseigneur']);
+	});
+
+	it('should replace records', () => {
+		expect.assertions(6);
+
+		const meta = new Metadata();
+		meta.put('sandwich', 'reuben', 'ham');
+
+		expect(meta.keys().size).toEqual(1);
+		expect(meta.get('sandwich')).toEqual(['reuben', 'ham']);
+
+		meta.replace('sandwich', ['croque monseigneur']);
+		expect(meta.keys().size).toEqual(1);
+		expect(meta.get('sandwich')).toEqual(['croque monseigneur']);
+
+		meta.replace('sandwich', []);
+		expect(meta.keys().size).toEqual(0);
+		expect(meta.get('sandwich')).toEqual([]);
+	});
+})

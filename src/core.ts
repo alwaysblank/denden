@@ -55,6 +55,7 @@ export type MessageQuery = {
 export class Hub extends EventTarget {
 	private channels: Map<string, Channel> = new Map();
 	private running: WeakMap<{payload: unknown}, Array<CallbackResult>> = new WeakMap();
+	public metadata = new Metadata();
 
 	/**
 	 * Listen to messages sent to a particular channel.
@@ -414,5 +415,66 @@ export class ErrorEvent extends Event {
 	constructor(error: Error) {
 		super(ErrorEvent.NAME);
 		this.cause = error;
+	}
+}
+
+export class Metadata {
+	private data: Array<[string, unknown]> = [];
+	private cache: Map<string, unknown[]> = new Map();
+
+	/**
+	 * Insert a single record.
+	 */
+	put(name: string, ...value: unknown[]) {
+		const records: Array<[string, unknown]> = value.map(v => [name, v]);
+		this.data.push(...records);
+		this.cache = this.buildCache();
+	}
+
+	/**
+	 * Replace all records with `name`.
+	 *
+	 * This is how you would delete any specific `name` records
+	 */
+	replace(name: string, values: unknown[]) {
+		this.data = [ ...this.data.filter(([k]) => k !== name) ];
+		if (values.length > 0) {
+			const records: Array<[string, unknown]> = values.map(v => [name, v]);
+			this.data.push(...records);
+		}
+		this.cache = this.buildCache();
+	}
+
+	/**
+	 * Get records stored under `name`.
+	 */
+	get(name: string) {
+		return this.cache.get(name) ?? [];
+	}
+
+	/**
+	 * Get keys of all stored records.
+	 */
+	keys() {
+		return new Set(this.cache.keys());
+	}
+
+	/**
+	 * Builds or rebuilds the cache of records, which is used when requested records.
+	 *
+	 * @private
+	 */
+	private buildCache(): typeof this.cache {
+		const cache: typeof this.cache = new Map();
+		for (const v of this.data) {
+			const [key, value] = v;
+			let cached = cache.get(key);
+			if (!Array.isArray(cached)) {
+				cached = [];
+			}
+			cached.push(value);
+			cache.set(key, cached);
+		}
+		return cache;
 	}
 }
