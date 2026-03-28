@@ -17,6 +17,8 @@ type WaitForResults<T> = Array<WaitForResult<T>> & {failed?: Array<[ChannelRoute
 const ERRORS = {
     TIMED_OUT_SINGLE: 'TIMED OUT',
     TIMED_OUT_ALL: 'ALL ROUTES TIMED OUT',
+    EXPECTED: 'EXPECTED ROUTE DID NOT EXIST',
+    NO_ROUTES: 'NO VALID ROUTES',
 };
 
 /**
@@ -61,6 +63,7 @@ const SUCCESS = {
  * @param callback If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
+ * @param [expected=false] Whether `routes` should be expected.
  *
  * @example
  * const hub = new Hub();
@@ -73,8 +76,12 @@ const SUCCESS = {
  *
  * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, routes: ChannelRoute[], waitTime: number): void {
+function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, routes: ChannelRoute[], waitTime: number, expected: boolean = false): void {
     Promise.allSettled(routes.map(route => {
+        if (expected && !isExpected(hub, route)) {
+            // An expected route is not present, so reject immediately.
+            return Promise.reject(ERRORS.EXPECTED);
+        }
         return new Promise((resolve: (value: [r: ChannelRoute, v: T]) => void, reject) => {
             const unsub = hub.sub<T>(route, (payload) => {
                 resolve([route, payload]);
@@ -110,6 +117,7 @@ function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, rout
  * @param hub The {@link Hub} instance to which this will subscribe.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
+ * @param [expected=false] Whether `routes` should be expected.
  *
  * @example
  * const hub = new Hub();
@@ -123,9 +131,9 @@ function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, rout
  *
  * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Promise<WaitForResults<T>> {
+function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expected: boolean = false): Promise<WaitForResults<T>> {
 	const firstWithHub = withHub(hub, first<T>);
-	return asPromise<WaitForResults<T>, typeof firstWithHub>(firstWithHub)(routes, waitTime);
+	return asPromise<WaitForResults<T>, typeof firstWithHub>(firstWithHub)(routes, waitTime, expected);
 }
 
 /**
@@ -141,6 +149,7 @@ function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Prom
  * @param callback If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
+ * @param [expected=false] Whether `routes` should be expected.
  *
  * @example
  * const hub = new Hub();
@@ -153,14 +162,31 @@ function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Prom
  *
  * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), routes: ChannelRoute[], waitTime: number): void {
+function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), routes: ChannelRoute[], waitTime: number, expected: boolean = false): void {
     const waiter = new Promise((resolve: (results: WaitForResults<T>) => void, reject) => {
+       let results: WaitForResults<T> = [];
        const controller = new AbortController();
        const collector = new Map<ChannelRoute, T>();
+       if (expected) {
+           routes = routes.filter(route => {
+               if (isExpected(hub, route)) {
+                   return true;
+               }
+               if (!Array.isArray(results.failed)) {
+                   results.failed = [];
+               }
+               results.failed.push([route, ERRORS.EXPECTED]);
+               return false;
+           });
+       }
+       if (routes.length === 0) {
+           // We have no valid routes, so we should return immediately.
+           reject(ERRORS.NO_ROUTES);
+       }
        if(waitTime > -1) {
            setTimeout(() => {
                controller.abort(ERRORS.TIMED_OUT_SINGLE);
-               const results: WaitForResults<T> = [...collector.entries()];
+               results = [...collector.entries()];
                for (const route of routes) {
                    if (!collector.has(route)) {
                        if (!Array.isArray(results.failed)) {
@@ -189,7 +215,7 @@ function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), r
     });
     waiter.then(callback, failure => {
         const result: WaitForResults<T> = [];
-        result.failed= [['*', failure.toString()]];
+        result.failed = [['*', failure.toString()]];
         callback(result);
     });
 }
@@ -200,6 +226,7 @@ function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), r
  * @param hub The {@link Hub} instance to which this will subscribe.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
+ * @param [expected=false] Whether `routes` should be expected.
  *
  * @example
  * const hub = new Hub();
@@ -213,9 +240,18 @@ function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), r
  *
  * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latestAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Promise<WaitForResults<any>> {
+function latestAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expected: boolean = false): Promise<WaitForResults<any>> {
 	const latestWithHub = withHub(hub, latest<T>);
-	return asPromise<WaitForResults<any>, typeof latestWithHub>(latestWithHub)(routes, waitTime);
+	return asPromise<WaitForResults<any>, typeof latestWithHub>(latestWithHub)(routes, waitTime, expected);
+}
+
+function expect(hub: Hub, ...routes: ChannelRoute[]) {
+    hub.metadata.put('waiter.expecting', ...routes);
+}
+
+function isExpected(hub: Hub, route: ChannelRoute) {
+    const routes = hub.metadata.get('waiter.expecting');
+    return routes.indexOf(route) >= 0;
 }
 
 export {
@@ -223,6 +259,8 @@ export {
 	firstAsync,
     latest,
 	latestAsync,
+    expect,
+    isExpected,
     ERRORS,
     SUCCESS,
     WaitForResults,
