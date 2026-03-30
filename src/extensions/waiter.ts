@@ -28,6 +28,10 @@ const SUCCESS = {
     ALL_RECEIVED: 'ALL_ROUTES_RECEIVED',
 }
 
+export type ResultSuccess<T> = [1, ChannelRoute, T];
+export type ResultFailure = [0, ChannelRoute, string];
+export type Results<T> = Array<ResultSuccess<T>|ResultFailure>
+
 /**
  * Wait for the first message(s) sent to the specified {@link routes}, within the specified timeout.
  *
@@ -76,9 +80,9 @@ const SUCCESS = {
  *
  * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, routes: ChannelRoute[], waitTime: number, expected: boolean = false): void {
+function first<T>(hub: Hub, callback: (results: Results<T>) => void, routes: ChannelRoute[], waitTime: number, expected: boolean = false): void {
     Promise.allSettled(routes.map(route => {
-        if (expected && !isExpected(hub, route)) {
+        if (expected && !isFastReturnRoute(hub, route)) {
             // An expected route is not present, so reject immediately.
             return Promise.reject(ERRORS.EXPECTED);
         }
@@ -95,19 +99,12 @@ function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, rout
             }
         });
     })).then(results => {
-        const failed: WaitForResults<T>["failed"] = [];
-        const succeeded: WaitForResults<T> = results.filter((result, i): result is PromiseFulfilledResult<WaitForResult<T>> => {
-            if (result.status === 'rejected') {
-                const channel = routes[i];
-                failed.push([channel, result.reason]);
-                return false;
-            }
-            return true;
-        }).map(({value}) => value);
-        if (failed.length > 0) {
-            succeeded.failed = failed;
-        }
-        callback(succeeded);
+        callback(results.map((r, i) => {
+           if(r.status === 'rejected') {
+               return [0, routes[i], r.reason];
+           }
+           return [1, ...r.value];
+        }));
     });
 }
 
@@ -131,9 +128,16 @@ function first<T>(hub: Hub, callback: (results: WaitForResults<T>) => void, rout
  *
  * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expected: boolean = false): Promise<WaitForResults<T>> {
+function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expected: boolean = false): Promise<Results<T>> {
 	const firstWithHub = withHub(hub, first<T>);
-	return asPromise<WaitForResults<T>, typeof firstWithHub>(firstWithHub)(routes, waitTime, expected);
+	return asPromise<Results<T>, typeof firstWithHub>(firstWithHub)(routes, waitTime, expected);
+}
+
+class LatestCollector<T> extends Map<ChannelRoute, T> {
+    toResults(): Array<ResultSuccess<T>> {
+        return [...this.entries()]
+            .map(([route, value]) => [1, route, value]);
+    }
 }
 
 /**
@@ -162,20 +166,17 @@ function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expec
  *
  * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), routes: ChannelRoute[], waitTime: number, expected: boolean = false): void {
-    const waiter = new Promise((resolve: (results: WaitForResults<T>) => void, reject) => {
-       let results: WaitForResults<T> = [];
+function latest<T>(hub: Hub, callback: ((results: Results<T>) => void), routes: ChannelRoute[], waitTime: number, expected: boolean = false): void {
+    const waiter = new Promise((resolve: (results: Results<T>) => void, reject) => {
+       let results: Results<T> = [];
        const controller = new AbortController();
-       const collector = new Map<ChannelRoute, T>();
+       const collector = new LatestCollector<T>();
        if (expected) {
            routes = routes.filter(route => {
-               if (isExpected(hub, route)) {
+               if (isFastReturnRoute(hub, route)) {
                    return true;
                }
-               if (!Array.isArray(results.failed)) {
-                   results.failed = [];
-               }
-               results.failed.push([route, ERRORS.EXPECTED]);
+               results.push([0, route, ERRORS.EXPECTED]);
                return false;
            });
        }
@@ -186,16 +187,13 @@ function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), r
        if(waitTime > -1) {
            setTimeout(() => {
                controller.abort(ERRORS.TIMED_OUT_SINGLE);
-               results = [...collector.entries()];
+               results = [...results, ...collector.toResults()];
                for (const route of routes) {
                    if (!collector.has(route)) {
-                       if (!Array.isArray(results.failed)) {
-                           results.failed = [];
-                       }
-                       results.failed.push([route, ERRORS.TIMED_OUT_SINGLE]);
+                       results.push([0, route, ERRORS.TIMED_OUT_SINGLE]);
                    }
                }
-               if(!results.failed || routes.length > results.failed.length) {
+               if(results.some(r => 1 === r[0])) {
                    // At least one route succeeded, so resolve.
                    resolve(results);
                }
@@ -208,16 +206,12 @@ function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), r
                collector.set(route, payload);
                if (collector.size === routes.length) {
                    controller.abort(SUCCESS.ALL_RECEIVED);
-                   resolve([...collector.entries()]);
+                   resolve(collector.toResults());
                }
            }, 1, {signal: controller.signal})
        }
     });
-    waiter.then(callback, failure => {
-        const result: WaitForResults<T> = [];
-        result.failed = [['*', failure.toString()]];
-        callback(result);
-    });
+    waiter.then(callback, failure => callback([[0, '*', failure.toString()]]));
 }
 
 /**
@@ -240,18 +234,46 @@ function latest<T>(hub: Hub, callback: ((results: WaitForResults<T>) => void), r
  *
  * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latestAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expected: boolean = false): Promise<WaitForResults<any>> {
+function latestAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expected: boolean = false): Promise<Results<T>> {
 	const latestWithHub = withHub(hub, latest<T>);
-	return asPromise<WaitForResults<any>, typeof latestWithHub>(latestWithHub)(routes, waitTime, expected);
+	return asPromise<Results<T>, typeof latestWithHub>(latestWithHub)(routes, waitTime, expected);
 }
 
-function expect(hub: Hub, ...routes: ChannelRoute[]) {
-    hub.metadata.put('waiter.expecting', ...routes);
+function setFastReturnRoutes(hub: Hub, ...routes: ChannelRoute[]) {
+    hub.metadata.put('waiter.fast-return', ...routes.map(r => r.toString()));
 }
 
-function isExpected(hub: Hub, route: ChannelRoute) {
-    const routes = hub.metadata.get('waiter.expecting');
-    return routes.indexOf(route) >= 0;
+function isFastReturnRoute(hub: Hub, route: ChannelRoute) {
+    const routes = hub.metadata.get('waiter.fast-return');
+    return routes.indexOf(route.toString()) >= 0;
+}
+
+/**
+ * Return an array of only successes, in the format `[route, returnedValue]`.
+ */
+function getSucceeded<T>(results: Results<T>) {
+    return results.reduce((collected: Array<[ChannelRoute, T]>, result: ResultFailure|ResultSuccess<T>) => {
+        const [status, route, value] = result;
+        if (status === 0) {
+            return collected;
+        }
+        collected.push([route, value]);
+        return collected;
+    }, [])
+}
+
+/**
+ * Return an array of only failures, in the format `[route, failureReason]`.
+ */
+function getFailed(results: Results<unknown>) {
+    return results.reduce((collected: Array<[ChannelRoute, string]>, result: ResultFailure|ResultSuccess<unknown>) => {
+        const [status, route, value] = result;
+        if (status === 1) {
+            return collected;
+        }
+        collected.push([route, value]);
+        return collected;
+    }, [])
 }
 
 export {
@@ -259,8 +281,10 @@ export {
 	firstAsync,
     latest,
 	latestAsync,
-    expect,
-    isExpected,
+    setFastReturnRoutes,
+    isFastReturnRoute,
+    getSucceeded,
+    getFailed,
     ERRORS,
     SUCCESS,
     WaitForResults,
