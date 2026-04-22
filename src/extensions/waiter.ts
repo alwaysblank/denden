@@ -1,15 +1,9 @@
 import type {Hub, ChannelRoute} from "../core";
-import {asPromise, withHub} from '../tools';
+import {asPromise, resolveRoute, withHub} from '../tools';
 
-/**
- * A single result from a {@link first} or {@link latest} operation.
- */
-type WaitForResult<T> = [ChannelRoute, T];
-
-/**
- * The results from a {@link first} or {@link latest} operation.
- */
-type WaitForResults<T> = Array<WaitForResult<T>> & {failed?: Array<[ChannelRoute, string]>};
+const METADATA = {
+    FAST_RETURN: 'waiter.fast-return',
+}
 
 /**
  * Enum defining error codes for {@link first} and {@link latest} functions.
@@ -67,7 +61,7 @@ export type Results<T> = Array<ResultSuccess<T>|ResultFailure>
  * @param callback If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
- * @param [expected=false] Whether `routes` should be expected.
+ * @param [fastReturn=false] Whether `routes` should be expected.
  *
  * @example
  * const hub = new Hub();
@@ -80,9 +74,9 @@ export type Results<T> = Array<ResultSuccess<T>|ResultFailure>
  *
  * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function first<T>(hub: Hub, callback: (results: Results<T>) => void, routes: ChannelRoute[], waitTime: number, expected: boolean = false): void {
+function first<T>(hub: Hub, callback: (results: Results<T>) => void, routes: ChannelRoute[], waitTime: number, fastReturn: boolean = false): void {
     Promise.allSettled(routes.map(route => {
-        if (expected && !isFastReturnRoute(hub, route)) {
+        if (fastReturn && !isExpected(hub, route)) {
             // An expected route is not present, so reject immediately.
             return Promise.reject(ERRORS.EXPECTED);
         }
@@ -114,7 +108,7 @@ function first<T>(hub: Hub, callback: (results: Results<T>) => void, routes: Cha
  * @param hub The {@link Hub} instance to which this will subscribe.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
- * @param [expected=false] Whether `routes` should be expected.
+ * @param [fastReturn=false] Whether `routes` should be expected.
  *
  * @example
  * const hub = new Hub();
@@ -128,11 +122,14 @@ function first<T>(hub: Hub, callback: (results: Results<T>) => void, routes: Cha
  *
  * // "first: [['sandwich', 'reuben'], ['soup', 'chicken']]"
  */
-function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expected: boolean = false): Promise<Results<T>> {
+function firstAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, fastReturn: boolean = false): Promise<Results<T>> {
 	const firstWithHub = withHub(hub, first<T>);
-	return asPromise<Results<T>, typeof firstWithHub>(firstWithHub)(routes, waitTime, expected);
+	return asPromise<Results<T>, typeof firstWithHub>(firstWithHub)(routes, waitTime, fastReturn);
 }
 
+/**
+ * Use by {@link latest} to collect results and ultimately return them.
+ */
 class LatestCollector<T> extends Map<ChannelRoute, T> {
     toResults(): Array<ResultSuccess<T>> {
         return [...this.entries()]
@@ -149,11 +146,13 @@ class LatestCollector<T> extends Map<ChannelRoute, T> {
  *
  * @see first
  *
- * @param hub The {@link Hub} instance to which this will subscribe.
- * @param callback If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
- * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
- * @param waitTime Time in milliseconds to wait for a message before timing out.
- * @param [expected=false] Whether `routes` should be expected.
+ * @param {Object} hub The {@link Hub} instance to which this will subscribe.
+ * @param {function} callback If passed, this will be called with the results array. If not present, this function will instead return a Promise which resolves to the results array.
+ * @param {Array} routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
+ * @param {number} waitTime Time in milliseconds to wait for a message before timing out.
+ * @param {Object} settings Optional setting that control behavior of `latest`.
+ * @param {boolean} [settings.fastReturn=false] If true, any items in `routes` that aren't registered as "expected" will immediately reject.
+ * @param {number} [settings.backlog=1] Number of messages to pull from the backlog when subscribing, if any.
  *
  * @example
  * const hub = new Hub();
@@ -166,52 +165,21 @@ class LatestCollector<T> extends Map<ChannelRoute, T> {
  *
  * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latest<T>(hub: Hub, callback: ((results: Results<T>) => void), routes: ChannelRoute[], waitTime: number, expected: boolean = false): void {
-    const waiter = new Promise((resolve: (results: Results<T>) => void, reject) => {
-       let results: Results<T> = [];
-       const controller = new AbortController();
-       const collector = new LatestCollector<T>();
-       if (expected) {
-           routes = routes.filter(route => {
-               if (isFastReturnRoute(hub, route)) {
-                   return true;
-               }
-               results.push([0, route, ERRORS.EXPECTED]);
-               return false;
-           });
-       }
-       if (routes.length === 0) {
-           // We have no valid routes, so we should return immediately.
-           reject(ERRORS.NO_ROUTES);
-       }
-       if(waitTime > -1) {
-           setTimeout(() => {
-               controller.abort(ERRORS.TIMED_OUT_SINGLE);
-               results = [...results, ...collector.toResults()];
-               for (const route of routes) {
-                   if (!collector.has(route)) {
-                       results.push([0, route, ERRORS.TIMED_OUT_SINGLE]);
-                   }
-               }
-               if(results.some(r => 1 === r[0])) {
-                   // At least one route succeeded, so resolve.
-                   resolve(results);
-               }
-               // Every route failed, so reject.
-               reject(ERRORS.TIMED_OUT_ALL);
-           }, waitTime);
-       }
-       for (const route of routes) {
-           hub.sub<T>(route, (payload) => {
-               collector.set(route, payload);
-               if (collector.size === routes.length) {
-                   controller.abort(SUCCESS.ALL_RECEIVED);
-                   resolve(collector.toResults());
-               }
-           }, 1, {signal: controller.signal})
-       }
-    });
-    waiter.then(callback, failure => callback([[0, '*', failure.toString()]]));
+function latest<T>(hub: Hub, callback: ((results: Results<T>) => void), routes: ChannelRoute[], waitTime: number, settings: {
+    backlog?: number;
+} = {}): void {
+    tail(
+        hub,
+        callback,
+        ({ options }) => {
+            options = {
+                ...options,
+                ...settings,
+            }
+            options.routes = routes;
+            options.waitTime = waitTime;
+        }
+    )
 }
 
 /**
@@ -220,7 +188,6 @@ function latest<T>(hub: Hub, callback: ((results: Results<T>) => void), routes: 
  * @param hub The {@link Hub} instance to which this will subscribe.
  * @param routes An array of route descriptors (see {@link Hub} for details on valid route descriptors).
  * @param waitTime Time in milliseconds to wait for a message before timing out.
- * @param [expected=false] Whether `routes` should be expected.
  *
  * @example
  * const hub = new Hub();
@@ -234,17 +201,120 @@ function latest<T>(hub: Hub, callback: ((results: Results<T>) => void), routes: 
  *
  * // "last: [['sandwich', 'club'], ['soup', 'chicken']]"
  */
-function latestAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number, expected: boolean = false): Promise<Results<T>> {
-	const latestWithHub = withHub(hub, latest<T>);
-	return asPromise<Results<T>, typeof latestWithHub>(latestWithHub)(routes, waitTime, expected);
+function latestAsync<T>(hub: Hub, routes: ChannelRoute[], waitTime: number): Promise<Results<T>> {
+    const latestWithHub = withHub(hub, latest<T>);
+    return asPromise<Results<T>, typeof latestWithHub>(latestWithHub)(routes, waitTime);
 }
 
-function setFastReturnRoutes(hub: Hub, ...routes: ChannelRoute[]) {
-    hub.metadata.put('waiter.fast-return', ...routes.map(r => r.toString()));
+function expectedLatest<T>(hub: Hub, callback: ((results: Results<T>) => void), routes: string[], waitTime: number, settings: {
+    backlog?: number;
+} = {}): void {
+    tail(
+        hub,
+        callback,
+        ({
+             options,
+             results,
+         }) => {
+            options.waitTime = waitTime;
+            options.routes = routes.filter(route => {
+                if (!isExpected(hub, route)) {
+                    results.push([0, route, ERRORS.EXPECTED]);
+                    return false;
+                }
+                return true;
+            });
+            if (settings.backlog) {
+                options.backlog = settings.backlog;
+            }
+        }
+    )
 }
 
-function isFastReturnRoute(hub: Hub, route: ChannelRoute) {
-    const routes = hub.metadata.get('waiter.fast-return');
+/**
+ * Core logic for `latest` functions.
+ */
+function tail<T>(hub: Hub, resolved: (results: Results<T>) => void, setup: ({resolve, reject, results, controller, collector, options}: {
+    resolve: Function,
+    reject: Function,
+    results: Results<T>,
+    controller: AbortController,
+    collector: LatestCollector<T>,
+    options: {
+        routes: ChannelRoute[],
+        waitTime: number,
+        backlog?: number,
+    }
+}) => void): void {
+    const waiter = new Promise((resolve: (results: Results<T>) => void, reject: (reason: string) => void) => {
+        let results: Results<T> = [];
+        const controller = new AbortController();
+        const collector = new LatestCollector<T>();
+        const options: {
+            routes: ChannelRoute[],
+            waitTime: number,
+            backlog?: number,
+        } = {
+            routes: [],
+            waitTime: 0,
+        };
+        setup({
+            resolve,
+            reject,
+            results,
+            controller,
+            collector,
+            options,
+        });
+        const {routes, waitTime, backlog = 1} = options;
+        if (routes.length === 0) {
+            // We have no valid routes, so we should return immediately.
+            reject(ERRORS.NO_ROUTES);
+        }
+        if(waitTime > -1) {
+            setTimeout(() => {
+                controller.abort(ERRORS.TIMED_OUT_SINGLE);
+                results = [...results, ...collector.toResults()];
+                for (const route of routes) {
+                    if (!collector.has(route)) {
+                        results.push([0, route, ERRORS.TIMED_OUT_SINGLE]);
+                    }
+                }
+                if(results.some(r => 1 === r[0])) {
+                    // At least one route succeeded, so resolve.
+                    resolve(results);
+                }
+                // Every route failed, so reject.
+                reject(ERRORS.TIMED_OUT_ALL);
+            }, waitTime);
+        }
+        for (const route of routes) {
+            hub.sub<T>(route, (payload) => {
+                collector.set(route, payload);
+                if (collector.size === routes.length) {
+                    controller.abort(SUCCESS.ALL_RECEIVED);
+                    resolve(collector.toResults());
+                }
+            }, backlog, {signal: controller.signal})
+        }
+    });
+    waiter.then(resolved, failure => resolved([[0, '*', failure.toString()]]));
+}
+
+function setExpected(hub: Hub, ...routes: ChannelRoute[]) {
+    hub.metadata.put(METADATA.FAST_RETURN, ...routes);
+}
+
+function isExpected(hub: Hub, route: ChannelRoute) {
+    const routes: ChannelRoute[] = hub.metadata.get(METADATA.FAST_RETURN) || [];
+    for (const expected of routes) {
+        if (route instanceof RegExp) {
+            return expected instanceof RegExp && expected.toString() === route.toString();
+        }
+        if (resolveRoute(expected, [route]).size > 0) {
+            return true;
+        }
+    }
     return routes.indexOf(route.toString()) >= 0;
 }
 
@@ -281,12 +351,11 @@ export {
 	firstAsync,
     latest,
 	latestAsync,
-    setFastReturnRoutes,
-    isFastReturnRoute,
+    setExpected,
+    isExpected,
     getSucceeded,
     getFailed,
     ERRORS,
     SUCCESS,
-    WaitForResults,
-    WaitForResult
+    METADATA,
 }

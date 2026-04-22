@@ -2,7 +2,7 @@ import {Hub} from './core';
 import {makeQueue, QueuedRecord} from './queue';
 import {once, only, until} from './extensions/conditionals';
 import {asPromise, getAffix, match, reverseString, sortByProp, withHub} from './tools';
-import {first, firstAsync, latest, latestAsync, expect, isExpected} from './extensions/waiter';
+import {first, firstAsync, latest, latestAsync, setExpected, isExpected} from './extensions/waiter';
 import {watch} from './extensions/watch';
 
 type BrowserHub = Hub & {
@@ -39,7 +39,7 @@ const extensions = {
 	firstAsync: tools.withHub(firstAsync),
 	latest: tools.withHub(latest),
 	latestAsync: tools.withHub(latestAsync),
-	expect: tools.withHub(expect),
+	expect: tools.withHub(setExpected),
 	isExpected: tools.withHub(isExpected),
 }
 const queue = makeQueue(window.denden, window.denden.queue ?? []);

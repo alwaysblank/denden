@@ -1,4 +1,4 @@
-import {match, sortByProp} from './tools';
+import {match, resolveRoute, sortByProp} from './tools';
 
 export type ChannelRoute = string | RegExp;
 
@@ -207,19 +207,7 @@ export class Hub extends EventTarget {
 	 * Return a Set of channels tracked by this Hub that match {@link query}.
 	 */
 	getChannels(query: ChannelRoute|ChannelRoute[]): Set<string> {
-		if ('*' === query) {
-			return new Set(this.channels.keys());
-		}
-		if (!Array.isArray(query)) {
-			query = [query];
-		}
-		const channels = new Set<string>();
-		this.channels.keys().forEach(c => {
-			if (match(query, c)) {
-				channels.add(c);
-			}
-		});
-		return channels;
+		return resolveRoute(query, [...this.channels.keys()]);
 	}
 
 	/**
@@ -448,8 +436,8 @@ export class Metadata {
 	/**
 	 * Get records stored under `name`.
 	 */
-	get(name: string) {
-		return this.cache.get(name) ?? [];
+	get<T>(name: string) {
+		return (this.cache.get(name) || []) as T[];
 	}
 
 	/**

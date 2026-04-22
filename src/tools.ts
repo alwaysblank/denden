@@ -1,4 +1,4 @@
-import type {Hub} from './core';
+import type {ChannelRoute, Hub} from './core';
 
 /**
  * Return a version of {@link F} which omits the first argument.
@@ -100,6 +100,29 @@ export const getAffix = (str: string) => {
     return {
         term: reverse ? reverseString(partial) : partial,
         isSuffix: reverse,
+    }
+}
+
+/**
+ * Determine which channels in `channels` will match with `route`.
+ */
+export const resolveRoute = (route: ChannelRoute|Array<ChannelRoute>, channels: Array<string>) => {
+    try {
+        if ('*' === route) {
+            return new Set(channels);
+        }
+        if (!Array.isArray(route)) {
+            route = [route];
+        }
+
+        return new Set(channels.reduce((collected: Array<string>, channel) => {
+            if (match(route, channel)) {
+                collected.push(channel);
+            }
+            return collected;
+        }, []));
+    } catch (_) {
+        return new Set<string>();
     }
 }
 

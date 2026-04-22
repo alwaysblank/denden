@@ -1,4 +1,5 @@
 import {getAffix, match, reverseString, sortByProp} from '../src';
+import {resolveRoute} from "../src/tools";
 
 describe('sortByProp', () => {
    it('should sort by specified prop', () => {
@@ -102,4 +103,11 @@ describe('reverseString', () => {
 		expect(reverseString(string)).toEqual('hciwdnas nebuer');
 		expect(reverseString(reverseString(string))).toEqual('reuben sandwich');
 	});
+});
+
+describe('resolveRoute', () => {
+    it('should resolve a string against the routes', () => {
+        const resolved = resolveRoute('*wich', ['sandwich']);
+        return;
+    });
 });
